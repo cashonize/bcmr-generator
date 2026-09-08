@@ -9,13 +9,13 @@ This Json file can then be hosted on the web on a domain name you control or can
 ## Project Setup
 
 ```sh
-yarn
+pnpm install
 ```
 
 ### Run Locally
 
 ```sh
-yarn dev
+pnpm dev
 ```
 
 ## Historic Version

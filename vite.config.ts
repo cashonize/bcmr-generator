@@ -1,13 +1,11 @@
 import { fileURLToPath, URL } from 'node:url'
-import topLevelAwait from "vite-plugin-top-level-await";
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// https://vitejs.dev/config/
+// https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    vue(),
-    topLevelAwait()
+    vue()
   ],
   resolve: {
     alias: {
