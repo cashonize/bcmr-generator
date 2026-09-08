@@ -57,6 +57,99 @@ main {
 ul {
   padding: 0;
 }
+/* ==========================================================================
+   Generated registry preview
+   ========================================================================== */
+
+.formError {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--color-error);
+  background: var(--bg-secondary-color);
+  color: var(--color-error);
+}
+
+.preview {
+  margin-top: 25px;
+  border: 1px solid var(--color-lightGrey);
+  border-radius: 6px;
+  background: var(--bg-secondary-color);
+  overflow: hidden;
+}
+.previewHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-lightGrey);
+}
+.previewMeta {
+  margin-left: 8px;
+  color: var(--muted-color);
+  font-size: 0.9em;
+}
+.previewActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* the secondary action next to the green download button */
+.previewCopy {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.9em;
+  background: transparent;
+  border: 1px solid var(--color-lightGrey);
+  color: var(--font-color);
+}
+.previewCopy:hover {
+  border-color: var(--color-grey);
+}
+
+.hashBox {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-lightGrey);
+}
+.hashLabel {
+  font-size: 0.85em;
+  color: var(--muted-color);
+  margin-bottom: 4px;
+}
+.hashValue {
+  display: block;
+  word-break: break-all;
+  font-size: 0.85em;
+  background: var(--bg-color);
+  color: var(--font-color);
+}
+.hashNote {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: var(--muted-color);
+}
+
+.previewJson {
+  margin: 0;
+  padding: 14px;
+  max-height: 420px;
+  overflow: auto;
+  background: var(--bg-color);
+  font-family: var(--font-family-mono);
+  font-size: 0.85em;
+  line-height: 1.45;
+  white-space: pre;
+  tab-size: 2;
+}
+
+@media (max-width: 560px) {
+  .previewHead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 footer {
   margin-top: 60px;
   padding: 20px 0 10px;

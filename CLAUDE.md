@@ -42,14 +42,23 @@ The whole app is three meaningful files:
 - **`src/generateBcmr.ts`**: pure functions `validInputs()` and `generateBcmr()` that
   turn a `DetailsObj` into a `Registry`.
 
-The data flow is deliberately one-directional and un-reactive: `createBcmrFile()` in
-`App.vue` snapshots every ref into a single `DetailsObj` literal, validates it, calls
-`generateBcmr()`, and downloads the result.
+The flow is generate, preview, then download. `generateBcmrFile()` validates and records
+`generatedAt`; from then on the preview is a `computed` over the form, so what is shown and
+what is downloaded cannot drift apart. That matters more than usual here: the panel shows
+the file's SHA-256, and a BCMR publication commits that hash on-chain, so a preview that
+could lie about the download would be worse than no preview.
+
+`generatedAt` is frozen at the click rather than recomputed, so editing a field afterwards
+does not keep moving the registry's `latestRevision`.
 
 **Adding a form field means touching four places**: a new `ref` in `App.vue`, a field on
-`DetailsObj`, the details object literal in `createBcmrFile()`, and the consumption in
+`DetailsObj`, the object literal in `buildDetails()`, and the consumption in
 `generateBcmr()` (plus `validInputs()` if it is required). Because they are wired by hand
 rather than derived, forgetting one of the four is the most likely bug.
+
+The hash uses Web Crypto, not libauth's `sha256`, on purpose: see the libauth note below.
+It is plain SHA-256 over the file's bytes, hex and not reversed, which is the same hash a
+wallet verifies a published registry against.
 
 Note that **every `DetailsObj` field is a `string`**, including numeric ones
 (`tokenDecimals`, `numberNFTs`, `startingNumber`); they hold raw input values, and

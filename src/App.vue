@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref } from "vue"
+  import { computed, ref, watch } from "vue"
   import { generateBcmr, validInputs } from "./generateBcmr"
   import Toggle from '@vueform/toggle'
   import ThemeToggle from './components/ThemeToggle.vue'
@@ -27,16 +27,17 @@
   const addUri = () => {listLinks.value.push([])}
   const removeUri = () => {listLinks.value.pop()}
 
-  function createBcmrFile(){
-    const date = new Date().toISOString();
-    const registryIdentityName = `bcmr for ${tokenName.value}`;
-    const registryIdentityDescription = `self-published bcmr for ${tokenName.value}`;
+  // The timestamp the current preview was generated with, and the flag for whether
+  // there is a preview at all. Frozen on Generate rather than recomputed, so editing
+  // a field afterwards does not keep moving the registry's latestRevision.
+  const generatedAt = ref<string | null>(null);
+  const validationError = ref("");
 
-    // create object with all userInputs
-    const details: DetailsObj = {
+  function buildDetails(date: string): DetailsObj {
+    return {
       date,
-      registryIdentityName,
-      registryIdentityDescription,
+      registryIdentityName: `bcmr for ${tokenName.value}`,
+      registryIdentityDescription: `self-published bcmr for ${tokenName.value}`,
       tokenId: tokenId.value,
       tokenName: tokenName.value,
       tokenDescription: tokenDescription.value,
@@ -55,24 +56,107 @@
       webUrl: webUrl.value,
       listLinks: listLinks.value,
     }
-    const validDetailsObj = validInputs(details);
-    if(!validDetailsObj){
-      alert("Fill in all the required fields before generating the JSON file!");
-      return
-    }
-    const bcmrJsonObj = generateBcmr(details);
-    if(bcmrJsonObj) download(JSON.stringify(bcmrJsonObj,null, 2));
   }
 
-  function download(stringifiedObj:string){
+  // The preview tracks the form once it exists, so what is shown and what is
+  // downloaded can never drift apart. That matters more than usual here: the hash
+  // below is what a BCMR publication commits to on-chain.
+  const registry = computed(() =>
+    generatedAt.value ? generateBcmr(buildDetails(generatedAt.value)) : null
+  );
+
+  const registryJson = computed(() =>
+    registry.value ? JSON.stringify(registry.value, null, 2) : ""
+  );
+
+  // the exact bytes the download writes, and so the bytes the hash covers
+  const registryBytes = computed(() => new TextEncoder().encode(registryJson.value));
+
+  const nftTypeCount = computed(() => {
+    const types = registry.value?.identities?.[tokenId.value]?.[generatedAt.value ?? ""]
+      ?.token?.nfts?.parse.types;
+    return types ? Object.keys(types).length : 0;
+  });
+
+  const byteSize = computed(() => {
+    const bytes = registryBytes.value.length;
+    return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} kB`;
+  });
+
+  // A big collection is tens of thousands of lines, which is no use as a preview and
+  // slow to paint. Keep the head and the tail: the tail is where an off-by-one in the
+  // NFT numbering shows up, so truncating only the end would hide the likeliest mistake.
+  const HEAD_LINES = 300;
+  const TAIL_LINES = 60;
+  const previewJson = computed(() => {
+    const lines = registryJson.value.split("\n");
+    if (lines.length <= HEAD_LINES + TAIL_LINES) return registryJson.value;
+    const hidden = lines.length - HEAD_LINES - TAIL_LINES;
+    return [
+      ...lines.slice(0, HEAD_LINES),
+      ``,
+      `    ... ${hidden.toLocaleString()} lines hidden, the download holds the full file ...`,
+      ``,
+      ...lines.slice(-TAIL_LINES),
+    ].join("\n");
+  });
+
+  // sha256 over the file's bytes, hex, not reversed: the same hash a wallet checks a
+  // published registry against. Web Crypto rather than libauth's sha256 on purpose,
+  // since libauth's crypto entrypoints would pull a wasm module into the bundle.
+  const fileHash = ref("");
+  let hashToken = 0;
+  watch(registryBytes, async (bytes) => {
+    const token = ++hashToken;
+    if (!bytes.length || !globalThis.crypto?.subtle) {
+      fileHash.value = "";
+      return
+    }
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    if (token !== hashToken) return // a newer edit already won
+    fileHash.value = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }, { immediate: true });
+
+  function generateBcmrFile(){
+    const date = new Date().toISOString();
+    if(!validInputs(buildDetails(date))){
+      validationError.value = "Fill in all the required fields before generating the JSON file!";
+      generatedAt.value = null;
+      return
+    }
+    validationError.value = "";
+    generatedAt.value = date;
+  }
+
+  function downloadFile(){
+    if(!registryJson.value) return
+    // a Blob rather than a data: URI, which has a length limit a large NFT
+    // collection can exceed
+    const blob = new Blob([registryBytes.value], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
     const element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(stringifiedObj));
-    element.setAttribute('download', 'bcmr.json');
+    element.href = url;
+    element.download = 'bcmr.json';
     element.style.display = 'none';
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+    URL.revokeObjectURL(url);
   }
+
+  const copied = ref(false);
+  async function copyJson(){
+    try {
+      await navigator.clipboard.writeText(registryJson.value);
+      copied.value = true;
+      setTimeout(() => { copied.value = false }, 1500);
+    } catch {
+      // clipboard blocked; the download is still there
+    }
+  }
+
 </script>
 
 <template>
@@ -153,7 +237,35 @@
       </div>
     </div>
 
-    <input @click="createBcmrFile" class="button primary" type="button" style="margin-top:15px" value="Download BCMR json file">
+    <input @click="generateBcmrFile" class="button primary" type="button" style="margin-top:15px" value="Generate BCMR json file">
+
+    <div v-if="validationError" class="formError">{{ validationError }}</div>
+
+    <section v-if="registry" class="preview">
+      <div class="previewHead">
+        <div>
+          <b>Generated registry</b>
+          <span class="previewMeta">
+            {{ byteSize }}<template v-if="nftTypeCount"> · {{ nftTypeCount.toLocaleString() }} NFT types</template>
+          </span>
+        </div>
+        <div class="previewActions">
+          <button @click="copyJson" type="button" class="previewCopy">{{ copied ? 'Copied' : 'Copy JSON' }}</button>
+          <input @click="downloadFile" class="button primary" type="button" value="Download bcmr.json">
+        </div>
+      </div>
+
+      <div v-if="fileHash" class="hashBox">
+        <div class="hashLabel">SHA-256 of this file</div>
+        <code class="hashValue">{{ fileHash }}</code>
+        <div class="hashNote">
+          This is the hash a BCMR publication commits to on-chain. Publish it only for the
+          exact file you host: re-generating after any edit, this timestamp included, changes it.
+        </div>
+      </div>
+
+      <pre class="previewJson">{{ previewJson }}</pre>
+    </section>
 
     <footer>
       <a class="footerLink" href="https://github.com/mr-zwets/bcmr-generator" target="_blank" rel="noopener">
