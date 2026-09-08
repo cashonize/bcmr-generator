@@ -1,8 +1,8 @@
 <script setup lang="ts">
   import { computed, ref, watch } from "vue"
   import { generateBcmr, validInputs } from "./generateBcmr"
-  import Toggle from '@vueform/toggle'
   import ThemeToggle from './components/ThemeToggle.vue'
+  import ToggleSwitch from './components/ToggleSwitch.vue'
   import type { DetailsObj } from "./interfaces/interfaces";
 
   const tokenId = ref("");
@@ -189,7 +189,7 @@
     <div>Decimals (suggested to not use more than 8)</div>
     <input v-model="tokenDecimals" type="number" placeholder="0">
 
-    Has NFTs <Toggle v-model="hasNftFields" style="vertical-align: middle; toggleHeight: 18rem; display: inline-block;"/>
+    <div>Has NFTs <ToggleSwitch v-model="hasNftFields" /></div>
 
     <div v-if="hasNftFields" style="margin-left: 25px;">
       <div>Number of unique NFTs *</div>
@@ -215,7 +215,7 @@
       <input v-model="nftIconType" placeholder="png">
       <div>
         Has High-resolution Image for NFTs (besides 400x400px icon)
-        <Toggle v-model="hasImages" style="vertical-align: middle; toggleHeight: 18rem; display: inline-block;"/>
+        <ToggleSwitch v-model="hasImages" />
       </div>
     </div>
 
@@ -297,5 +297,3 @@
 
   </main>
 </template>
-
-<style src="@vueform/toggle/themes/default.css"></style>

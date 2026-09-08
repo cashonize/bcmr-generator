@@ -144,8 +144,8 @@ textarea:focus {
   box-shadow: 0 0 1px var(--color-primary);
 }
 
-/* @vueform/toggle renders checkbox inputs internally, so this rule still
-   applies even though the form has no checkbox of its own. */
+/* ToggleSwitch is built on a native checkbox, which sets its own size; this is
+   kept so any plain checkbox added later still matches upstream chota. */
 [type="checkbox"],
 [type="radio"] {
   width: 2rem;

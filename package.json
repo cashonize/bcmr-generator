@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@bitauth/libauth": "^3.0.0",
-    "@vueform/toggle": "^2.1.4",
     "vue": "^3.5.42"
   },
   "devDependencies": {

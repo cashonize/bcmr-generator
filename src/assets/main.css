@@ -30,10 +30,6 @@
   /* chota's grey is a border colour in dark mode, too dim to read as text */
   --muted-color: #98a2ae;
 
-  /* @vueform/toggle: only the off state clashes, its green reads fine on dark */
-  --toggle-bg-off: #313840;
-  --toggle-border-off: #313840;
-  --toggle-text-off: #d8dde2;
 }
 
 :root[data-theme="dark"] select {
@@ -98,7 +94,7 @@ ul {
 .firstFieldRow {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
 }
 .requiredNote {
@@ -106,6 +102,7 @@ ul {
   color: var(--muted-color);
   white-space: nowrap;
 }
+
 
 /* ==========================================================================
    Generated registry preview

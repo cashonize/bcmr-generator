@@ -11,9 +11,6 @@ importers:
       '@bitauth/libauth':
         specifier: ^3.0.0
         version: 3.0.0
-      '@vueform/toggle':
-        specifier: ^2.1.4
-        version: 2.1.4
       vue:
         specifier: ^3.5.42
         version: 3.5.42(typescript@6.0.3)
@@ -396,9 +393,6 @@ packages:
         optional: true
       vue:
         optional: true
-
-  '@vueform/toggle@2.1.4':
-    resolution: {integrity: sha512-tEITFf5wlqIWoCYZXJdoXvCnrc97weOu2csR/BEoROVvFu1zRsoK0wY1pJG7BR+g5zpGJneGSdLhMUsbx8y1yw==}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1300,8 +1294,6 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
       vue: 3.5.42(typescript@6.0.3)
-
-  '@vueform/toggle@2.1.4': {}
 
   acorn-jsx@5.3.2(acorn@8.18.0):
     dependencies:
