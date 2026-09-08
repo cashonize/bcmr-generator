@@ -3,6 +3,8 @@
 :root {
   color-scheme: light;
   --color-primary: #0ac18f;
+  /* footer text: chota has no muted-text variable of its own */
+  --muted-color: #747681;
 }
 
 /*
@@ -25,6 +27,8 @@
      dark page this has to become the light half of the pair */
   --color-darkGrey: #e2e7ec;
   --color-error: #ff8079;
+  /* chota's grey is a border colour in dark mode, too dim to read as text */
+  --muted-color: #98a2ae;
 
   /* @vueform/toggle: only the off state clashes, its green reads fine on dark */
   --toggle-bg-off: #313840;
@@ -53,20 +57,52 @@ main {
 ul {
   padding: 0;
 }
-footer{
-  margin-top: 50px;
-}
-#githubLink {
+footer {
+  margin-top: 60px;
+  padding: 20px 0 10px;
+  border-top: 1px solid var(--color-lightGrey);
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+  gap: 4px 14px;
+  font-size: 0.9em;
 }
-.githublogo {
-width: 64px;
+.footerLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted-color);
+  transition: color 0.2s ease;
+}
+.footerLink:hover {
+  color: var(--color-primary);
+}
+.footerIcon {
+  width: 18px;
+  height: 18px;
+}
+.footerHeart {
+  width: 14px;
+  height: 14px;
+  color: var(--color-primary);
+}
+.footerDot {
+  color: var(--muted-color);
+}
+
+@media (max-width: 480px) {
+  .footerDot {
+    display: none;
+  }
+  footer {
+    flex-direction: column;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body {
+  body,
+  .footerLink {
     transition: none;
   }
 }
