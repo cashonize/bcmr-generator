@@ -58,6 +58,56 @@ ul {
   padding: 0;
 }
 /* ==========================================================================
+   Page header
+   ========================================================================== */
+
+.pageHead {
+  margin-bottom: 32px;
+}
+.pageHead h1 {
+  margin: 0;
+  font-size: 2.2em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+/* short green rule, tying the header to the accent the buttons and links use */
+.pageHead h1::after {
+  content: "";
+  display: block;
+  width: 54px;
+  height: 3px;
+  margin-top: 12px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+.lead {
+  margin: 18px 0 0;
+  font-size: 1.05em;
+  line-height: 1.5;
+}
+.leadMeta {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+  color: var(--muted-color);
+}
+.leadDot {
+  margin: 0 4px;
+}
+
+/* the note sits on the first label row, where the first asterisk appears */
+.firstFieldRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.requiredNote {
+  font-size: 0.85em;
+  color: var(--muted-color);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
    Generated registry preview
    ========================================================================== */
 

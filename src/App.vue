@@ -162,11 +162,20 @@
 <template>
   <ThemeToggle />
   <main>
-    <h1>BCMR Generator</h1>
-    <div style="font-weight: bold; margin-bottom: 15px;">Generate the BCMR Json file for your CashTokens project!</div>
-    <div style="display: flex;justify-content: space-between;">
+    <header class="pageHead">
+      <h1>BCMR Generator</h1>
+      <p class="lead">
+        Give your CashTokens a name, a symbol and an icon in every wallet that reads BCMR.
+      </p>
+      <p class="leadMeta">
+        Fill in the form, check the preview, publish the hash on-chain.
+        <span class="leadDot" aria-hidden="true">·</span>
+        <a href="https://cashtokens.org/docs/category/metadata-registries-chip" target="_blank" rel="noopener">What is BCMR? &rarr;</a>
+      </p>
+    </header>
+    <div class="firstFieldRow">
       TokenId *
-      <div>(*) means required</div>
+      <span class="requiredNote">* marks a required field</span>
     </div>
     <input v-model="tokenId" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f">
     <div>Token Name *</div>
