@@ -1,8 +1,50 @@
 @import './chota-subset.css';
 
 :root {
+  color-scheme: light;
   --color-primary: #0ac18f;
 }
+
+/*
+ * Dark theme. Set on <html> by src/composables/useTheme.ts (and by the
+ * pre-paint script in index.html, so the page never flashes light first).
+ *
+ * Almost everything is a re-point of the chota variables the subset defines;
+ * the rules underneath cover the two places chota hardcodes a light colour
+ * instead of reading a variable.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-color: #15181b;
+  --bg-secondary-color: #1e2227;
+  --font-color: #d8dde2;
+  --color-lightGrey: #313840;
+  --color-grey: #4d5762;
+  /* chota paints button labels with darkGrey on a lightGrey button, so on a
+     dark page this has to become the light half of the pair */
+  --color-darkGrey: #e2e7ec;
+  --color-error: #ff8079;
+
+  /* @vueform/toggle: only the off state clashes, its green reads fine on dark */
+  --toggle-bg-off: #313840;
+  --toggle-border-off: #313840;
+  --toggle-text-off: #d8dde2;
+}
+
+:root[data-theme="dark"] select {
+  background-color: var(--bg-secondary-color);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='40' fill='%23a9b2bc'><polygon points='0,0 60,0 30,40'/></svg>");
+}
+
+:root[data-theme="dark"] ::placeholder {
+  color: #6b7480;
+}
+
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
 main {
   max-width: 750px;
   width: 80%;
@@ -21,4 +63,10 @@ footer{
 }
 .githublogo {
 width: 64px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
 }

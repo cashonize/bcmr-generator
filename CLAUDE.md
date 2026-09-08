@@ -85,3 +85,18 @@ bringing its rule across from upstream, not assuming it is there.
 `<style src>` at the bottom of `App.vue`. It renders checkbox inputs internally, which is
 why the subset keeps chota's `[type="checkbox"]` rule even though the form has no checkbox
 of its own.
+
+### Theming
+
+`src/composables/useTheme.ts` owns the light/dark choice: it writes `data-theme` on
+`<html>`, persists to `localStorage` under `bcmr-generator-theme`, and follows the OS
+until the visitor picks a side. `components/ThemeToggle.vue` is the only consumer.
+
+The dark palette in `main.css` is almost entirely a re-point of the chota variables the
+subset defines, so new UI inherits it by using those variables rather than raw hex. Two
+rules exist because chota hardcodes a light colour instead of reading a variable: the
+`select` background and arrow, and `::placeholder`. Adding a component with its own colours
+means adding a `:root[data-theme="dark"]` case for it.
+
+`index.html` sets `data-theme` in an inline script before first paint so a dark visitor
+never sees a white flash; its storage key has to stay in sync with the composable.

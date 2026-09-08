@@ -2,6 +2,7 @@
   import { ref } from "vue"
   import { generateBcmr, validInputs } from "./generateBcmr"
   import Toggle from '@vueform/toggle'
+  import ThemeToggle from './components/ThemeToggle.vue'
   import type { DetailsObj } from "./interfaces/interfaces";
 
   const tokenId = ref("");
@@ -75,6 +76,7 @@
 </script>
 
 <template>
+  <ThemeToggle />
   <main>
     <h1>BCMR Generator</h1>
     <div style="font-weight: bold; margin-bottom: 15px;">Generate the BCMR Json file for your CashTokens project!</div>

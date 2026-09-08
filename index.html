@@ -7,6 +7,17 @@
     <title>BCMR Generator</title>
     <meta name="description" content="BCMR Metadata Generator for Bitcoin Cash (BCH) CashTokens">
     <script defer data-domain="bcmr-generator.netlify.app" src="https://plausible.io/js/script.js"></script>
+    <script>
+      // set the theme before first paint so a dark visitor never sees a white flash
+      // keep the storage key in sync with src/composables/useTheme.ts
+      try {
+        var t = localStorage.getItem('bcmr-generator-theme')
+        if (t !== 'dark' && t !== 'light') {
+          t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        document.documentElement.dataset.theme = t
+      } catch (e) { /* private mode: fall back to the light default */ }
+    </script>
   </head>
   <body>
     <div id="app"></div>
