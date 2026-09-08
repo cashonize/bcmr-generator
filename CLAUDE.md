@@ -71,6 +71,17 @@ WASM and the top-level await back in.
 
 ## Styling
 
-`chota` (a CSS micro-framework, imported in `src/assets/main.css`) plus inline styles on
-elements. `@vueform/toggle` provides the toggle switches; its theme CSS is pulled in by
-the `<style src>` at the bottom of `App.vue`.
+Base CSS is a vendored subset of chota v0.9.2 (`src/assets/chota-subset.css`), imported by
+`src/assets/main.css`. chota itself is no longer a dependency. The subset carries only the
+base and form rules this form uses, copied from chota's unprefixed `src/` modules rather
+than its `dist/` build, whose legacy prefixes target browsers below the app's build
+target. Everything else is inline styles on elements.
+
+Left out of the subset: the grid, nav, cards, tabs, tags, dropdowns, tables, the utility
+classes, and the button and input variants the app never applies. Using one of those means
+bringing its rule across from upstream, not assuming it is there.
+
+`@vueform/toggle` provides the toggle switches; its theme CSS is pulled in by the
+`<style src>` at the bottom of `App.vue`. It renders checkbox inputs internally, which is
+why the subset keeps chota's `[type="checkbox"]` rule even though the form has no checkbox
+of its own.

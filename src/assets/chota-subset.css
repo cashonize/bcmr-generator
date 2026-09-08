@@ -1,0 +1,208 @@
+/*
+ * Curated subset of chota v0.9.2 (https://jenil.github.io/chota/).
+ * MIT License, Copyright (c) 2017 Jenil Gogari.
+ * Vendored from the upstream `src/` modules rather than the prefixed `dist/`
+ * build: the legacy -webkit-/-ms- prefixes chota ships target browsers well
+ * below this app's build target.
+ *
+ * Includes only what the form actually uses from _base and _form: typography,
+ * links, code, images, text inputs, selects and buttons. Left out: the grid,
+ * nav, cards, tabs, tags, dropdowns, tables, the utility classes, and the
+ * button and input variants the app never applies.
+ */
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+:root {
+  --bg-color: #fff;
+  --bg-secondary-color: #f3f3f6;
+  --color-primary: #14854f;
+  --color-lightGrey: #d2d6dd;
+  --color-grey: #747681;
+  --color-darkGrey: #3f4144;
+  --color-error: #d43939;
+  --font-size: 1.6rem;
+  --font-color: #333;
+  --font-family-sans: -apple-system, "BlinkMacSystemFont", "Avenir",
+    "Avenir Next", "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
+    "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  --font-family-mono: monaco, "Consolas", "Lucida Console", monospace;
+}
+
+html {
+  box-sizing: border-box;
+  font-size: 62.5%;
+  line-height: 1.15;
+  text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+body {
+  background-color: var(--bg-color);
+  line-height: 1.6;
+  font-size: var(--font-size);
+  color: var(--font-color);
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif; /* fallback */
+  font-family: var(--font-family-sans);
+  margin: 0;
+  padding: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 500;
+  margin: 0.35em 0 0.7em;
+}
+
+h1 {
+  font-size: 2em;
+}
+
+h2 {
+  font-size: 1.75em;
+}
+
+h3 {
+  font-size: 1.5em;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover:not(.button) {
+  opacity: 0.75;
+}
+
+button {
+  font-family: inherit;
+}
+
+code {
+  font-family: var(--font-family-mono);
+  font-size: 90%;
+  white-space: pre-wrap;
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  background-color: var(--bg-secondary-color);
+  color: var(--color-error);
+}
+
+img {
+  max-width: 100%;
+}
+
+/* ==========================================================================
+   Form
+   ========================================================================== */
+
+input:not([type="checkbox"], [type="radio"], [type="submit"], [type="color"], [type="button"], [type="reset"]),
+select,
+textarea {
+  font-family: inherit;
+  padding: 0.8rem 1rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-lightGrey);
+  font-size: 1em;
+  transition: all 0.2s ease;
+  display: block;
+  width: 100%;
+}
+
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #f3f3f6 no-repeat 100%;
+  background-size: 1ex;
+  background-origin: content-box;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='40' fill='%23555'><polygon points='0,0 60,0 30,40'/></svg>");
+}
+
+input:not([type="checkbox"], [type="radio"], [type="submit"], [type="color"], [type="button"], [type="reset"], :disabled):hover,
+select:hover,
+textarea:hover {
+  border-color: var(--color-grey);
+}
+
+input:not([type="checkbox"], [type="radio"], [type="submit"], [type="color"], [type="button"], [type="reset"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 1px var(--color-primary);
+}
+
+/* @vueform/toggle renders checkbox inputs internally, so this rule still
+   applies even though the form has no checkbox of its own. */
+[type="checkbox"],
+[type="radio"] {
+  width: 2rem;
+  height: 1.6rem;
+}
+
+::placeholder {
+  color: #bdbfc4;
+}
+
+.button,
+[type="button"],
+[type="reset"],
+[type="submit"],
+button {
+  padding: 1rem 2.5rem;
+  color: var(--color-darkGrey);
+  background: var(--color-lightGrey);
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: var(--font-size);
+  line-height: 1;
+  text-align: center;
+  transition: opacity 0.2s ease;
+  text-decoration: none;
+  transform: scale(1);
+  display: inline-block;
+  cursor: pointer;
+}
+
+.button.primary,
+[type="submit"] {
+  color: #fff;
+  background-color: #000;
+  background-color: var(--color-primary);
+}
+
+.button:hover,
+[type="button"]:hover,
+[type="reset"]:hover,
+[type="submit"]:hover,
+button:hover {
+  opacity: 0.8;
+}
+
+.button:active:not(:disabled),
+[type="button"]:active:not(:disabled),
+[type="reset"]:active:not(:disabled),
+[type="submit"]:active:not(:disabled),
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+input:disabled,
+input:disabled:hover,
+button:disabled,
+button:disabled:hover {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

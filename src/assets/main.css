@@ -1,4 +1,4 @@
-@import 'chota';
+@import './chota-subset.css';
 
 :root {
   --color-primary: #0ac18f;
