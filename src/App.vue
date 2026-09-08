@@ -1,6 +1,8 @@
 <script setup lang="ts">
   import { computed, ref, watch } from "vue"
   import { generateBcmr, validInputs } from "./generateBcmr"
+  import { parseRegistry, applyUpdate, prefillFrom, nextVersion, type Prefill } from "./updateBcmr"
+  import type { Registry } from "./interfaces/bcmr-v2.schema"
   import ThemeToggle from './components/ThemeToggle.vue'
   import InfoTip from './components/InfoTip.vue'
   import ToggleSwitch from './components/ToggleSwitch.vue'
@@ -27,6 +29,82 @@
   const listLinks = ref([] as ([] | [string | undefined, string | undefined])[]);
   const addUri = () => {listLinks.value.push([])}
   const removeUri = () => {listLinks.value.pop()}
+
+  // Fresh registry, or a new snapshot on one that already exists. The second is
+  // what stops a returning user silently dropping their own history.
+  const mode = ref<"new" | "update">("new");
+  const loadedText = ref("");
+  const loadedFileName = ref("");
+  const loadedBase = ref<Registry | null>(null);
+  const loadedInfo = ref<Prefill | null>(null);
+  const loadError = ref("");
+  const committedHash = ref("");
+  // prefilled with nextVersion, editable because a change this app cannot see
+  // (an identity removed by hand) is a major
+  const versionMajor = ref("");
+  const versionMinor = ref("");
+  const versionPatch = ref("");
+
+  function loadRegistry(text: string) {
+    loadedText.value = text;
+    if (!text.trim()) { clearLoaded(); return }
+    const result = parseRegistry(text);
+    if ("error" in result) {
+      loadError.value = result.error;
+      loadedBase.value = null;
+      loadedInfo.value = null;
+      committedHash.value = "";
+      return
+    }
+    const prefill = prefillFrom(result.registry, new Date().toISOString());
+    if (!prefill) {
+      loadError.value = "That registry has no identities to update.";
+      loadedBase.value = null;
+      loadedInfo.value = null;
+      return
+    }
+    loadError.value = "";
+    loadedBase.value = result.registry;
+    loadedInfo.value = prefill;
+    generatedAt.value = null;
+
+    const next = nextVersion(result.registry);
+    versionMajor.value = String(next.major);
+    versionMinor.value = String(next.minor);
+    versionPatch.value = String(next.patch);
+
+    tokenId.value = prefill.authbase;
+    tokenName.value = prefill.name;
+    tokenDescription.value = prefill.description;
+    tokenSymbol.value = prefill.symbol;
+    tokenDecimals.value = prefill.decimals;
+    iconUri.value = prefill.iconUri;
+    webUrl.value = prefill.webUrl;
+    listLinks.value = prefill.listLinks.map(([key, value]) => [key, value] as [string, string]);
+    hasNftFields.value = false; // an existing nfts block is carried over as it is
+
+    void hashBytes(new TextEncoder().encode(text)).then((hex) => { committedHash.value = hex });
+  }
+
+  function clearLoaded() {
+    loadedText.value = "";
+    loadedBase.value = null;
+    loadedInfo.value = null;
+    loadError.value = "";
+    committedHash.value = "";
+    loadedFileName.value = "";
+    versionMajor.value = "";
+    versionMinor.value = "";
+    versionPatch.value = "";
+    generatedAt.value = null;
+  }
+
+  function onFile(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return
+    loadedFileName.value = file.name;
+    void file.text().then(loadRegistry);
+  }
 
   // The timestamp the current preview was generated with, and the flag for whether
   // there is a preview at all. Frozen on Generate rather than recomputed, so editing
@@ -62,9 +140,23 @@
   // The preview tracks the form once it exists, so what is shown and what is
   // downloaded can never drift apart. That matters more than usual here: the hash
   // below is what a BCMR publication commits to on-chain.
-  const registry = computed(() =>
-    generatedAt.value ? generateBcmr(buildDetails(generatedAt.value)) : null
-  );
+  function versionPart(input: string, fallback: number): number {
+    const parsed = parseInt(input, 10);
+    return Number.isNaN(parsed) || parsed < 0 ? fallback : parsed
+  }
+
+  const registry = computed(() => {
+    if (!generatedAt.value) return null
+    const fresh = generateBcmr(buildDetails(generatedAt.value));
+    const base = loadedBase.value;
+    if (!base) return fresh
+    const fallback = nextVersion(base);
+    return applyUpdate(base, fresh, tokenId.value, generatedAt.value, {
+      major: versionPart(versionMajor.value, fallback.major),
+      minor: versionPart(versionMinor.value, fallback.minor),
+      patch: versionPart(versionPatch.value, fallback.patch),
+    })
+  });
 
   const registryJson = computed(() =>
     registry.value ? JSON.stringify(registry.value, null, 2) : ""
@@ -105,23 +197,28 @@
   // sha256 over the file's bytes, hex, not reversed: the same hash a wallet checks a
   // published registry against. Web Crypto rather than libauth's sha256 on purpose,
   // since libauth's crypto entrypoints would pull a wasm module into the bundle.
+  async function hashBytes(bytes: Uint8Array): Promise<string> {
+    if (!bytes.length || !globalThis.crypto?.subtle) return ""
+    const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("")
+  }
+
   const fileHash = ref("");
   let hashToken = 0;
   watch(registryBytes, async (bytes) => {
     const token = ++hashToken;
-    if (!bytes.length || !globalThis.crypto?.subtle) {
-      fileHash.value = "";
-      return
-    }
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const hex = await hashBytes(bytes);
     if (token !== hashToken) return // a newer edit already won
-    fileHash.value = Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    fileHash.value = hex;
   }, { immediate: true });
 
   function generateBcmrFile(){
     const date = new Date().toISOString();
+    if(mode.value === "update" && !loadedBase.value){
+      validationError.value = "Load the registry you are updating first.";
+      generatedAt.value = null;
+      return
+    }
     if(!validInputs(buildDetails(date))){
       validationError.value = "Fill in all the required fields before generating the JSON file!";
       generatedAt.value = null;
@@ -174,6 +271,54 @@
         <a href="https://cashtokens.org/docs/category/metadata-registries-chip" target="_blank" rel="noopener">What is BCMR? &rarr;</a>
       </p>
     </header>
+    <div class="modePill">
+      <button type="button" :class="{ active: mode === 'new' }" @click="mode = 'new'; clearLoaded()">New registry</button>
+      <button type="button" :class="{ active: mode === 'update' }" @click="mode = 'update'">Update existing</button>
+    </div>
+    <div class="modeNote">
+      <template v-if="mode === 'new'">A fresh registry naming a single token.</template>
+      <template v-else>Adds a snapshot to a registry you already published.</template>
+    </div>
+
+    <div v-if="mode === 'update'" class="loadBox">
+      <div class="loadLead">
+        Paste the registry you published, or load the file. Everything in it is kept: other
+        identities, earlier snapshots, and fields this form does not show.
+      </div>
+      <textarea
+        class="loadInput"
+        rows="4"
+        placeholder='{ "$schema": "https://cashtokens.org/bcmr-v2.schema.json", ... }'
+        :value="loadedText"
+        @input="loadRegistry(($event.target as HTMLTextAreaElement).value)"
+      ></textarea>
+      <div class="loadActions">
+        <label class="secondaryButton">
+          Choose file
+          <input class="fileInput" type="file" accept="application/json,.json" @change="onFile">
+        </label>
+        <span v-if="loadedFileName" class="loadFileName">{{ loadedFileName }}</span>
+        <button v-if="loadedText" type="button" class="secondaryButton" @click="clearLoaded">Clear</button>
+      </div>
+      <div v-if="loadError" class="formError">{{ loadError }}</div>
+      <div v-else-if="loadedInfo" class="loadSummary">
+        Loaded version {{ loadedBase?.version.major }}.{{ loadedBase?.version.minor }}.{{ loadedBase?.version.patch }},
+        {{ loadedInfo.identityCount }} identit{{ loadedInfo.identityCount === 1 ? 'y' : 'ies' }},
+        {{ loadedInfo.snapshotCount }} snapshot{{ loadedInfo.snapshotCount === 1 ? '' : 's' }} on this one.
+        Generating adds a snapshot and bumps the minor version.
+        <template v-if="loadedInfo.keepsNfts"> Its existing NFT types are carried over as they are.</template>
+        <div class="versionRow">
+          <span>New version</span>
+          <input v-model="versionMajor" type="number" min="0" aria-label="major">
+          <span class="versionDot">.</span>
+          <input v-model="versionMinor" type="number" min="0" aria-label="minor">
+          <span class="versionDot">.</span>
+          <input v-model="versionPatch" type="number" min="0" aria-label="patch">
+          <InfoTip text="The spec's rule: major when an identity is removed, minor when an identity or snapshot is added, patch when an existing snapshot or a registry property is corrected. Adding a snapshot is what this does, so minor is filled in for you.">what these mean</InfoTip>
+        </div>
+      </div>
+    </div>
+
     <div class="firstFieldRow">
       <span><InfoTip text="The token's category id: 64 hex characters, shown as the category by any wallet holding the token.">TokenId</InfoTip> *</span>
       <span class="requiredNote">* marks a required field</span>
@@ -247,7 +392,7 @@
       </div>
     </div>
 
-    <input @click="generateBcmrFile" class="button primary" type="button" style="margin-top:15px" value="Generate BCMR json file">
+    <input @click="generateBcmrFile" class="button primary" type="button" style="margin-top:15px" :value="mode === 'update' ? 'Generate updated BCMR' : 'Generate BCMR json file'">
 
     <div v-if="validationError" class="formError">{{ validationError }}</div>
 
@@ -260,13 +405,19 @@
           </span>
         </div>
         <div class="previewActions">
-          <button @click="copyJson" type="button" class="previewCopy">{{ copied ? 'Copied' : 'Copy JSON' }}</button>
+          <button @click="copyJson" type="button" class="secondaryButton">{{ copied ? 'Copied' : 'Copy JSON' }}</button>
           <input @click="downloadFile" class="button primary" type="button" value="Download bcmr.json">
         </div>
       </div>
 
       <div v-if="fileHash" class="hashBox">
-        <div class="hashLabel">SHA-256 of this file</div>
+        <template v-if="committedHash">
+          <div class="hashLabel">SHA-256 currently published (the file you loaded)</div>
+          <code class="hashValue">{{ committedHash }}</code>
+        </template>
+        <div class="hashLabel" :style="committedHash ? 'margin-top: 10px;' : ''">
+          SHA-256 of this file{{ committedHash ? ', to publish next' : '' }}
+        </div>
         <code class="hashValue">{{ fileHash }}</code>
         <div class="hashNote">
           This is the hash a BCMR publication commits to on-chain. Publish it only for the

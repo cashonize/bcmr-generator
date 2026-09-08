@@ -105,6 +105,108 @@ ul {
 
 
 /* ==========================================================================
+   Mode select and the registry loader
+   ========================================================================== */
+
+/* cashonize's .type-filter segmented pill bar: a choice between two jobs, which
+   is what that control is for, rather than an on/off switch */
+.modePill {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 3px;
+  border-radius: 20px;
+  background-color: rgba(128, 128, 128, 0.12);
+}
+.modePill button {
+  margin: 0;
+  padding: 5px 16px;
+  border: none;
+  border-radius: 17px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+.modePill button.active {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+/* one line saying what each mode does, since the pill labels alone do not say
+   that the fresh path writes a single-token registry */
+.modeNote {
+  margin-bottom: 22px;
+  font-size: 0.9em;
+  color: var(--muted-color);
+}
+
+.loadBox {
+  margin-bottom: 22px;
+  padding: 14px;
+  border: 1px solid var(--color-lightGrey);
+  border-radius: 6px;
+  background: var(--bg-secondary-color);
+}
+.loadLead {
+  margin-bottom: 10px;
+  font-size: 0.9em;
+  color: var(--muted-color);
+}
+.loadInput {
+  font-family: var(--font-family-mono);
+  font-size: 0.85em;
+  resize: vertical;
+}
+.loadActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.9em;
+}
+.loadSummary {
+  margin-top: 10px;
+  font-size: 0.9em;
+  color: var(--muted-color);
+}
+/* chota's input rule is `input:not(...)`, specificity (0,1,1), so it beats both
+   the hidden attribute and a bare class. Hiding the native picker needs to outrank
+   it; the label around it is the button. */
+.loadActions input.fileInput {
+  display: none;
+}
+.loadFileName {
+  font-size: 0.9em;
+  color: var(--muted-color);
+  overflow-wrap: anywhere;
+}
+
+/* the three version boxes sit on one line, sized to the numbers they hold */
+.versionRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--font-color);
+}
+.versionRow input {
+  width: 4.5em;
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+  /* the spinners cost more width than they are worth at this size */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.versionRow input::-webkit-outer-spin-button,
+.versionRow input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.versionDot {
+  color: var(--muted-color);
+}
+
+/* ==========================================================================
    Generated registry preview
    ========================================================================== */
 
@@ -143,16 +245,22 @@ ul {
   align-items: center;
   gap: 8px;
 }
-/* the secondary action next to the green download button */
-.previewCopy {
+/* the secondary action: beside the green download button, and the file picker */
+.secondaryButton {
+  display: inline-block;
   padding: 0.6rem 1.2rem;
+  border-radius: 4px;
   font-size: 0.9em;
+  line-height: 1;
   background: transparent;
   border: 1px solid var(--color-lightGrey);
   color: var(--font-color);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
-.previewCopy:hover {
+.secondaryButton:hover {
   border-color: var(--color-grey);
+  background: var(--bg-color);
 }
 
 .hashBox {
