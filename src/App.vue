@@ -2,6 +2,7 @@
   import { computed, ref, watch } from "vue"
   import { generateBcmr, validInputs } from "./generateBcmr"
   import ThemeToggle from './components/ThemeToggle.vue'
+  import InfoTip from './components/InfoTip.vue'
   import ToggleSwitch from './components/ToggleSwitch.vue'
   import type { DetailsObj } from "./interfaces/interfaces";
 
@@ -174,55 +175,55 @@
       </p>
     </header>
     <div class="firstFieldRow">
-      TokenId *
+      <span><InfoTip text="The token's category id: 64 hex characters, shown as the category by any wallet holding the token.">TokenId</InfoTip> *</span>
       <span class="requiredNote">* marks a required field</span>
     </div>
     <input v-model="tokenId" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f">
-    <div>Token Name *</div>
+    <div><InfoTip text="The name wallets show for this token. Interfaces with limited space may hide it beyond the first 20 characters, so lead with what identifies it.">Token Name</InfoTip> *</div>
     <input  v-model="tokenName" placeholder="DogeCash">
-    <div>Token Description *</div>
+    <div><InfoTip text="A sentence or two about the token. Interfaces with limited space may hide it beyond 140 characters.">Token Description</InfoTip> *</div>
     <input v-model="tokenDescription" placeholder="Don't let your dreams be memes">
-    <div>Token Symbol *</div>
+    <div><InfoTip text="Capital letters, numbers and dashes only, matching /^[-A-Z0-9]+$/ in the spec. This is the ticker wallets show next to an amount.">Token Symbol</InfoTip> *</div>
     <input v-model="tokenSymbol" placeholder="DOGECASH">
-    <div>Link Icon (https or ipfs)</div>
-    <input v-model="iconUri" placeholder="https:/example.com/Dogecoin_Logo.png">
-    <div>Decimals (suggested to not use more than 8)</div>
+    <div><InfoTip text="Must be a full URI including the scheme, e.g. https://... or ipfs://... A bare domain or path will not resolve. Clients are only required to support https and ipfs.">Link Icon (https or ipfs)</InfoTip></div>
+    <input v-model="iconUri" placeholder="https://example.com/Dogecoin_Logo.png">
+    <div><InfoTip text="How divisible one token is: 0 to 18. With decimals of 2 an on-chain amount of 123456 is shown as 1234.56. Leave empty for 0, which is what an NFT-only category wants.">Decimals</InfoTip> (suggested to not use more than 8)</div>
     <input v-model="tokenDecimals" type="number" placeholder="0">
 
-    <div>Has NFTs <ToggleSwitch v-model="hasNftFields" /></div>
+    <div><InfoTip text="Turn on if this category also issues NFTs. It adds an nfts block listing every NFT type by its on-chain commitment.">Has NFTs</InfoTip> <ToggleSwitch v-model="hasNftFields" /></div>
 
     <div v-if="hasNftFields" style="margin-left: 25px;">
-      <div>Number of unique NFTs *</div>
+      <div><InfoTip text="How many NFT entries to write, counting up from the starting number. One entry per commitment, so this is the size of the collection.">Number of unique NFTs</InfoTip> *</div>
       <input v-model="numberNFTs" type="number" placeholder="10">
-      <div>Numbering on-chain</div>
+      <div><InfoTip text="How each NFT's number becomes its on-chain commitment. VM-numbers is the spec's sequential encoding and what wallets expect: it is zero-based, so NFT 1 has an empty commitment, 2 is 01, and 129 is 8000 rather than 81. Hex is plain big-endian and only for old Cashonize collections.">Numbering on-chain</InfoTip></div>
       <select name="numbering" v-model="numbering" style="width: 350px;">
         <option value="vm-numbers">VM-numbers (default)</option>
         <option value="hex">hexadecimal (for old Cashonize collections)</option>
       </select>
-      <div>StartingNumber *</div>
+      <div><InfoTip text="The number the first NFT carries, usually 1. It shifts both the names and the commitments, so it has to match how the collection was actually minted.">StartingNumber</InfoTip> *</div>
       <input v-model="startingNumber" type="number" placeholder="1">
-      <div>NFT Name * ( <code>{i}</code> will be replaced by the NFT number)</div>
+      <div><InfoTip text="Written for every NFT in the collection, with {i} replaced by that NFT's number: ABC #{i} becomes ABC #1, ABC #2 and so on.">NFT Name</InfoTip> * ( <code>{i}</code> will be replaced by the NFT number)</div>
       <input v-model="nftName" placeholder="ABC collection #{i}">
-      <div>NFT Description ( <code>{i}</code> will be replaced by the NFT number)</div>
+      <div><InfoTip text="Same {i} substitution as the name. Optional: leave it empty and the NFTs get no description.">NFT Description</InfoTip> ( <code>{i}</code> will be replaced by the NFT number)</div>
       <input v-model="nftDescription" placeholder="Number {i} of the ABC collection with 500 NFTs">
       <b>Image folder:</b> The image folder should have the 400x400 NFT icons named as <code>1.png</code>,
       <code>2.png</code>, etc.<br />
       <span style="margin-left: 10px;">Optional high-res images should be included as <code>1-img.png</code>,
         <code>2-img.png</code>, etc.<br /></span>
-      <div>Link Image Folder (https or ipfs)</div>
+      <div><InfoTip text="The folder holding the numbered images, as a full URI with its scheme and no trailing slash: each NFT's icon is this plus /1.png, /2.png and so on.">Link Image Folder (https or ipfs)</InfoTip></div>
       <input v-model="nftIconUri" placeholder="ipfs://bafybeifz7yag2hlxvmaahyo5kl5etajycxtxsryadcawzt4dgy3hrzzxdq">
-      <div>Image Type (png, svg, ...)</div>
+      <div><InfoTip text="The file extension of the images in the folder, without the dot. It is appended to every NFT number, so all the files have to share it.">Image Type</InfoTip> (png, svg, ...)</div>
       <input v-model="nftIconType" placeholder="png">
       <div>
-        Has High-resolution Image for NFTs (besides 400x400px icon)
+        <InfoTip text="Adds an image URI beside each icon, pointing at {i}-img in the same folder, for wallets that can show something larger than the 400x400 icon.">Has High-resolution Image for NFTs</InfoTip> (besides 400x400px icon)
         <ToggleSwitch v-model="hasImages" />
       </div>
     </div>
 
-    <div>Link website</div>
-    <input v-model="webUrl" placeholder="https:/example.com">
-    <div style="margin: 5px 0;">Extra Links
-      <button @click="removeUri" type="button" style="padding: 3px 5px; vertical-align: text-top; margin-right: 5px;">-</button>
+    <div><InfoTip text="The project's own site, published as the web URI. Needs the full URL including https://.">Link website</InfoTip></div>
+    <input v-model="webUrl" placeholder="https://example.com">
+    <div style="margin: 5px 0;"><InfoTip text="Extra places this identity lives, keyed by the spec's standard names. Each value is a full URI with its scheme, so a social link is the profile URL, not a handle.">Extra Links</InfoTip>
+      <button @click="removeUri" type="button" style="padding: 3px 5px; vertical-align: text-top; margin: 0 5px;">-</button>
       <button @click="addUri" type="button" style="padding: 3px 5px; vertical-align: text-top;">+</button>
     </div>
 
@@ -242,7 +243,7 @@
           <option value="youtube">youtube</option>
           <option value="instagram">instagram</option>
         </select>
-        <input placeholder="https:/example.com" @input="(event) => listLinks[index][1] = (event.target as HTMLInputElement).value">
+        <input placeholder="https://example.com" @input="(event) => listLinks[index][1] = (event.target as HTMLInputElement).value">
       </div>
     </div>
 
