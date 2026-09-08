@@ -4,7 +4,15 @@ Fill-in form to create the [BCMR](https://github.com/bitjson/chip-bcmr) Json fil
 
 This Json file can then be hosted on the web on a domain name you control or can be pinned on IPFS.
 
-![Screenshot0](./screenshots/Screenshot0.png)
+There are two modes.
+
+**New registry** writes a fresh registry naming a single token.
+
+![The form in New registry mode](./screenshots/screenshot0.png)
+
+**Update existing** takes a registry you already published, adds a new snapshot to it, and bumps the version by the spec's rule. Everything already in the file is kept, including other identities, earlier snapshots and fields the form does not show. The hash of the file you loaded is shown next to the hash of the new one, so you can see what is currently committed on-chain and what you are about to publish.
+
+![Update existing mode, with a registry loaded](./screenshots/screenshot1.png)
 
 ## Project Setup
 
@@ -24,8 +32,7 @@ pnpm dev
 
 📖 The [`docs`](./docs) folder covers the BCMR standard itself: [the registry files this generator writes](./docs/bcmr-registries.md) explains the identity model behind [CHIP-BCMR](https://github.com/bitjson/chip-bcmr), which parts of the output are the spec and which are this generator's own convention, the two NFT commitment encodings, and what the standard allows that the generator does not do yet.
 
-## Historic Version
+## Legacy version
 
-🪦 Before moving the generator to Vue it was written in vanilla-js. <br>
-You can find the old codebase [here](https://github.com/mr-zwets/bcmr-generator-vanillaJS).
+🪦 The generator began as a vanilla-JavaScript page, since superseded by this one. The archived [legacy codebase](https://github.com/mr-zwets/bcmr-generator-vanillaJS) is still on GitHub.
 

@@ -32,12 +32,15 @@ authenticates it. Hosting it is the user's job, and outside this app's scope.
 
 ## What the generator emits
 
-One `Registry` with exactly one identity and exactly one snapshot:
+In **New registry** mode, one `Registry` with exactly one identity and exactly one snapshot.
+In **Update existing** mode, the loaded registry with one snapshot added to it; see
+"Updating a registry" below.
 
-- `version` is always `0.1.0`. The spec's semantics are: **major** bumps when an identity
-  is removed, **minor** when an identity or a snapshot is added, **patch** when an existing
-  snapshot or a registry-level property is corrected. A regenerated file for an update is
-  therefore mislabelled as a first publication; see Future items.
+- `version` is `0.1.0` for a new registry. The spec's semantics are: **major** bumps when an
+  identity is removed, **minor** when an identity or a snapshot is added, **patch** when an
+  existing snapshot or a registry-level property is corrected. An update follows that rule,
+  bumping the minor and resetting the patch, and the value stays editable because an identity
+  removed by hand is a major and nothing in the file says so.
 - `latestRevision` and the snapshot's timestamp key are the same `new Date().toISOString()`
   string. The spec requires exactly that 24-character format.
 - `registryIdentity` is always an inline object (`{name, description}`, auto-derived as
@@ -48,6 +51,28 @@ One `Registry` with exactly one identity and exactly one snapshot:
   it is hosted. This is deliberate for the self-published single-token case the app targets.
 - `identities[tokenId][date]` carries `name`, `description`, `token` (`category`, `symbol`,
   optional `decimals`), and `uris`.
+
+## Updating a registry
+
+Update existing mode loads a registry, prefills the form from the current snapshot of its
+first identity, and on generate adds a snapshot under a new timestamp.
+
+The rule it follows is that anything the form does not model is carried through untouched:
+other identities, every earlier snapshot, and registry-level `tags`, `locales`, `chains`,
+`license` and `extensions`, as well as snapshot-level fields like `tags`, `migrated` and an
+existing `nfts` block. The hash of the result is what gets published on-chain, so anything
+dropped here would only surface once it was already committed.
+
+Two consequences of that rule. An empty form field means "leave this alone" rather than
+"erase it", so a URI or `decimals` present in the loaded file cannot be removed through an
+update. And an existing NFT collection is carried over as it stands rather than
+reverse-engineered back into the form's number, starting number and name template.
+
+Which identity is updated follows the TokenId field, so editing it aims the new snapshot at
+a different authbase, or adds one. The identities not named are kept either way.
+
+The panel shows the hash of the file that was loaded beside the hash of the new one: the
+first is what a publication currently commits to, the second is what to publish next.
 
 ## NFT commitments: the part that is easy to get wrong
 
@@ -103,11 +128,6 @@ What the standard enables that the generator does not do yet.
   files by hand today. Nothing written by this generator or by CashTokens Studio names more
   than one identity, which is why downstream wallets have not had to handle the case well
   either.
-- **Snapshot history / updates.** A registry update is a new snapshot added under the same
-  authbase with a later timestamp, keeping the old ones so clients can show what changed.
-  The generator always writes a single snapshot at `now` and always version `0.1.0`, so
-  updating a token means editing the previous file by hand. Taking an existing registry as
-  input and appending a snapshot is the natural shape of this.
 - **An authbase as `registryIdentity`.** Letting the user give the registry its own
   on-chain identity, per the spec's recommendation, instead of the inline object.
 - **The rest of the spec's optional surface.** `tags`, `license`, `locales`,
