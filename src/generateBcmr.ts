@@ -9,19 +9,19 @@ export function generateBcmr(details:DetailsObj):Registry {
     "$schema": "https://cashtokens.org/bcmr-v2.schema.json",
     "version": { "major": 0, "minor": 1, "patch": 0 },
     "latestRevision": details.date,
-    "registryIdentity": {
-      "name": details.registryIdentityName,
-      "description": details.registryIdentityDescription,
-    },
+    // an authbase makes the registry itself on-chain resolvable, which is the spec's
+    // recommendation; the inline object is what a self-published token registry wants
+    "registryIdentity": details.registryIdentityAuthbase
+      ? details.registryIdentityAuthbase
+      : {
+          "name": details.registryIdentityName,
+          "description": details.registryIdentityDescription,
+        },
     "identities": {
       [details.tokenId]: {
         [details.date]: {
           "name": details.tokenName,
           "description": details.tokenDescription,
-          "token": {
-            "category": details.tokenId,
-            "symbol": details.tokenSymbol
-          },
           "uris": {
             "icon": details.iconUri,
             "web": details.webUrl
@@ -32,17 +32,24 @@ export function generateBcmr(details:DetailsObj):Registry {
   }
   if(!bcmrJsonObj?.identities?.[details.tokenId][details.date]) throw new Error("Error in bcmrJsonObj")
   const snapshot = bcmrJsonObj.identities[details.tokenId][details.date];
-  if(!snapshot?.token) throw new Error("Error in snapshot")
-  const tokenDecimals = parseInt(details.tokenDecimals)
-  if(!Number.isNaN(tokenDecimals)) snapshot.token.decimals = tokenDecimals;
-  if(details.hasNftFields){
-    snapshot.token.nfts = {
+  if(!snapshot) throw new Error("Error in snapshot")
+  // the spec omits `token` entirely for an identity that is not a token
+  if(details.hasToken){
+    snapshot.token = {
+      "category": details.tokenId,
+      "symbol": details.tokenSymbol
+    };
+    const tokenDecimals = parseInt(details.tokenDecimals)
+    if(!Number.isNaN(tokenDecimals)) snapshot.token.decimals = tokenDecimals;
+  }
+  if(details.hasToken && details.hasNftFields){
+    snapshot.token!.nfts = {
       description: "",
       parse: {
         types: {}
       }
     };
-    const NFTtypes = snapshot.token.nfts.parse.types;
+    const NFTtypes = snapshot.token!.nfts!.parse.types;
     const startingNumber = parseInt(details.startingNumber) ?? 1;
     const endingNumber = startingNumber + parseInt(details.numberNFTs);
     for(let i=startingNumber; i < endingNumber; i++){

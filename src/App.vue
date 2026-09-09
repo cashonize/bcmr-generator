@@ -9,6 +9,14 @@
   import ToggleSwitch from './components/ToggleSwitch.vue'
   import type { DetailsObj } from "./interfaces/interfaces";
 
+  // Simple mode is self-publishing metadata for one token. Advanced is maintaining a
+  // registry: identities that are not tokens, and control of the registry's own identity.
+  const advanced = ref(false);
+  const hasToken = ref(true);
+  const registryName = ref("");
+  const registryDescription = ref("");
+  const registryAuthbase = ref("");
+
   const tokenId = ref("");
   const tokenName = ref("");
   const tokenDescription = ref("");
@@ -102,6 +110,47 @@
         }
   });
 
+  // the identity being updated already carries a token, and a category is a consensus
+  // fact, so the kind cannot be changed: lock it rather than ignore the switch silently
+  const tokenLocked = computed(() => Boolean(loadedInfo.value?.hasToken));
+
+  // Every label, tip and example that changes with the kind, in one place: a token's
+  // wording reads as nonsense on a contract system or an organization.
+  const copy = computed(() => hasToken.value
+    ? {
+        idLabel: "TokenId",
+        idTip: "The token's category id: 64 hex characters, shown as the category by any wallet holding the token.",
+        nameLabel: "Token Name",
+        nameTip: "The name wallets show for this token. Interfaces with limited space may hide it beyond the first 20 characters, so lead with what identifies it.",
+        descriptionLabel: "Token Description",
+        descriptionTip: "A sentence or two about the token. Interfaces with limited space may hide it beyond 140 characters.",
+        name: "DogeCash",
+        description: "Don't let your dreams be memes",
+        icon: "https://example.com/Dogecoin_Logo.png",
+        web: "https://example.com",
+      }
+    : {
+        idLabel: "Authbase",
+        idTip: "The identity's permanent id: 64 hex characters, the transaction its authchain starts from.",
+        nameLabel: "Name",
+        nameTip: "The name shown for this identity. Interfaces with limited space may hide it beyond the first 20 characters, so lead with what identifies it.",
+        descriptionLabel: "Description",
+        descriptionTip: "A sentence or two about this identity. Interfaces with limited space may hide it beyond 140 characters.",
+        name: "ACME DEX",
+        description: "The decentralized exchange contract system operated by ACME, Inc.",
+        icon: "https://acme.example/logo.svg",
+        web: "https://acme.example",
+      });
+
+  watch(advanced, (on) => {
+    if (on) return
+    hasToken.value = true;
+    registryName.value = "";
+    registryDescription.value = "";
+    registryAuthbase.value = "";
+  });
+  watch(tokenLocked, (locked) => { if (locked) hasToken.value = true });
+
   function clearLoaded() {
     loadedText.value = "";
     loadedBase.value = null;
@@ -131,8 +180,10 @@
   function buildDetails(date: string): DetailsObj {
     return {
       date,
-      registryIdentityName: `bcmr for ${tokenName.value}`,
-      registryIdentityDescription: `self-published bcmr for ${tokenName.value}`,
+      registryIdentityName: registryName.value || `bcmr for ${tokenName.value}`,
+      registryIdentityDescription: registryDescription.value || `self-published bcmr for ${tokenName.value}`,
+      registryIdentityAuthbase: advanced.value ? registryAuthbase.value : "",
+      hasToken: advanced.value ? hasToken.value : true,
       tokenId: tokenId.value,
       tokenName: tokenName.value,
       tokenDescription: tokenDescription.value,
@@ -308,13 +359,52 @@
         <a href="https://cashtokens.org/docs/category/metadata-registries-chip" target="_blank" rel="noopener">What is BCMR? &rarr;</a>
       </p>
     </header>
-    <div class="modePill">
-      <button type="button" :class="{ active: mode === 'new' }" @click="mode = 'new'; clearLoaded()">New registry</button>
-      <button type="button" :class="{ active: mode === 'update' }" @click="mode = 'update'">Update existing</button>
+    <div class="modeRow">
+      <div class="modePill">
+        <button type="button" :class="{ active: mode === 'new' }" @click="mode = 'new'; clearLoaded()">New registry</button>
+        <button type="button" :class="{ active: mode === 'update' }" @click="mode = 'update'">Update existing</button>
+      </div>
+      <label class="advancedToggle">
+        <InfoTip text="Simple mode self-publishes metadata for one token. Advanced is for maintaining a registry: identities that are not tokens, and control of the registry's own identity rather than the name derived for you.">Advanced</InfoTip>
+        <ToggleSwitch v-model="advanced" />
+      </label>
     </div>
     <div class="modeNote">
-      <template v-if="mode === 'new'">A fresh registry naming a single token.</template>
+      <template v-if="advanced">Registry author: name the registry itself, and describe identities that are not tokens.</template>
+      <template v-else-if="mode === 'new'">A fresh registry naming a single token.</template>
       <template v-else>Adds a snapshot to a registry you already published.</template>
+    </div>
+
+    <div v-if="advanced" class="advancedBox">
+      <div class="advancedStep">1. The registry itself</div>
+      <div class="loadLead">
+        How this registry names itself. Left empty, both fields are derived from the name
+        below, which suits a self-published registry and not an organization's.
+      </div>
+
+      <div>Registry name</div>
+      <input v-model="registryName" :disabled="Boolean(registryAuthbase)" :placeholder="`bcmr for ${tokenName || copy.name}`">
+      <div>Registry description</div>
+      <input v-model="registryDescription" :disabled="Boolean(registryAuthbase)" :placeholder="`self-published bcmr for ${tokenName || copy.name}`">
+
+      <div class="orRule"><span>or</span></div>
+
+      <div>
+        <InfoTip text="The spec lets a registry name its own identity by authbase rather than describing it here. Clients then verify who publishes the registry on-chain and read its details from that identity, instead of trusting it because of where the file is hosted.">Identify the registry on-chain</InfoTip>
+      </div>
+      <input v-model="registryAuthbase" :class="{ invalid: issueFor('registryIdentityAuthbase') }" placeholder="its authbase, 64 hex characters">
+      <div v-if="issueFor('registryIdentityAuthbase')" class="fieldError">{{ issueFor('registryIdentityAuthbase') }}</div>
+
+      <div class="advancedStep stepTwo">2. The identity you are describing</div>
+      <div class="kindRow">
+        <InfoTip text="Off for a person, organization, dapp or contract system: the spec omits the token block entirely for those, and symbol, decimals and NFTs go with it.">This identity has a token</InfoTip>
+        <ToggleSwitch v-model="hasToken" :disabled="tokenLocked" />
+        <span v-if="tokenLocked" class="kindLocked">locked: this identity already has one, and a category is permanent</span>
+      </div>
+      <div class="loadLead" style="margin: 6px 0 0;">
+        Off leaves a name, a description and URIs: a person, organization, dapp or contract
+        system. The fields for it are below.
+      </div>
     </div>
 
     <div v-if="mode === 'update'" class="loadBox">
@@ -344,6 +434,11 @@
         {{ loadedInfo.snapshotCount }} snapshot{{ loadedInfo.snapshotCount === 1 ? '' : 's' }} on this one.
         Generating adds a snapshot and bumps the minor version.
         <template v-if="loadedInfo.keepsNfts"> Its existing NFT types are carried over as they are.</template>
+        <div v-if="loadedInfo.identityCount > 1" class="loadWarning">
+          This registry names {{ loadedInfo.identityCount }} identities. The one in the
+          {{ copy.idLabel }} field below is the one being updated; the others are kept
+          exactly as they are. Authoring several identities here is not built yet.
+        </div>
         <div v-if="unorderableNote" class="loadWarning">
           {{ unorderableNote.lead }} <code>YYYY-MM-DDTHH:mm:ss.sssZ</code> form.
           {{ unorderableNote.rest }}
@@ -361,30 +456,30 @@
     </div>
 
     <div class="firstFieldRow">
-      <span><InfoTip text="The token's category id: 64 hex characters, shown as the category by any wallet holding the token.">TokenId</InfoTip> *</span>
+      <span><InfoTip :text="copy.idTip">{{ copy.idLabel }}</InfoTip> *</span>
       <span class="requiredNote">* marks a required field</span>
     </div>
-    <input v-model="tokenId" :class="{ invalid: issueFor('tokenId') }" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f">
+    <input v-model="tokenId" :class="{ invalid: issueFor('tokenId') }" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f5b7">
     <div v-if="issueFor('tokenId')" class="fieldError">{{ issueFor('tokenId') }}</div>
-    <div><InfoTip text="The name wallets show for this token. Interfaces with limited space may hide it beyond the first 20 characters, so lead with what identifies it.">Token Name</InfoTip> *</div>
-    <input  v-model="tokenName" :class="{ invalid: issueFor('tokenName') }" placeholder="DogeCash">
+    <div><InfoTip :text="copy.nameTip">{{ copy.nameLabel }}</InfoTip> *</div>
+    <input  v-model="tokenName" :class="{ invalid: issueFor('tokenName') }" :placeholder="copy.name">
     <div v-if="issueFor('tokenName')" class="fieldError">{{ issueFor('tokenName') }}</div>
-    <div><InfoTip text="A sentence or two about the token. Interfaces with limited space may hide it beyond 140 characters.">Token Description</InfoTip> *</div>
-    <input v-model="tokenDescription" :class="{ invalid: issueFor('tokenDescription') }" placeholder="Don't let your dreams be memes">
+    <div><InfoTip :text="copy.descriptionTip">{{ copy.descriptionLabel }}</InfoTip> *</div>
+    <input v-model="tokenDescription" :class="{ invalid: issueFor('tokenDescription') }" :placeholder="copy.description">
     <div v-if="issueFor('tokenDescription')" class="fieldError">{{ issueFor('tokenDescription') }}</div>
-    <div><InfoTip text="Capital letters, numbers and dashes only, matching /^[-A-Z0-9]+$/ in the spec. This is the ticker wallets show next to an amount.">Token Symbol</InfoTip> *</div>
-    <input v-model="tokenSymbol" :class="{ invalid: issueFor('tokenSymbol') }" placeholder="DOGECASH">
-    <div v-if="issueFor('tokenSymbol')" class="fieldError">{{ issueFor('tokenSymbol') }}</div>
+    <div v-if="hasToken"><InfoTip text="Capital letters, numbers and dashes only, matching /^[-A-Z0-9]+$/ in the spec. This is the ticker wallets show next to an amount.">Token Symbol</InfoTip> *</div>
+    <input v-if="hasToken" v-model="tokenSymbol" :class="{ invalid: issueFor('tokenSymbol') }" placeholder="DOGECASH">
+    <div v-if="hasToken && issueFor('tokenSymbol')" class="fieldError">{{ issueFor('tokenSymbol') }}</div>
     <div><InfoTip text="Must be a full URI including the scheme, e.g. https://... or ipfs://... A bare domain or path will not resolve. Clients are only required to support https and ipfs.">Link Icon (https or ipfs)</InfoTip></div>
-    <input v-model="iconUri" :class="{ invalid: issueFor('iconUri') }" placeholder="https://example.com/Dogecoin_Logo.png">
+    <input v-model="iconUri" :class="{ invalid: issueFor('iconUri') }" :placeholder="copy.icon">
     <div v-if="issueFor('iconUri')" class="fieldError">{{ issueFor('iconUri') }}</div>
-    <div><InfoTip text="How divisible one token is: 0 to 18. With decimals of 2 an on-chain amount of 123456 is shown as 1234.56. Leave empty for 0, which is what an NFT-only category wants.">Decimals</InfoTip> (suggested to not use more than 8)</div>
-    <input v-model="tokenDecimals" type="number" :class="{ invalid: issueFor('tokenDecimals') }" placeholder="0">
-    <div v-if="issueFor('tokenDecimals')" class="fieldError">{{ issueFor('tokenDecimals') }}</div>
+    <div v-if="hasToken"><InfoTip text="How divisible one token is: 0 to 18. With decimals of 2 an on-chain amount of 123456 is shown as 1234.56. Leave empty for 0, which is what an NFT-only category wants.">Decimals</InfoTip> (suggested to not use more than 8)</div>
+    <input v-if="hasToken" v-model="tokenDecimals" type="number" :class="{ invalid: issueFor('tokenDecimals') }" placeholder="0">
+    <div v-if="hasToken && issueFor('tokenDecimals')" class="fieldError">{{ issueFor('tokenDecimals') }}</div>
 
-    <div><InfoTip text="Turn on if this category also issues NFTs. It adds an nfts block listing every NFT type by its on-chain commitment.">Has NFTs</InfoTip> <ToggleSwitch v-model="hasNftFields" /></div>
+    <div v-if="hasToken"><InfoTip text="Turn on if this category also issues NFTs. It adds an nfts block listing every NFT type by its on-chain commitment.">Has NFTs</InfoTip> <ToggleSwitch v-model="hasNftFields" /></div>
 
-    <div v-if="hasNftFields" style="margin-left: 25px;">
+    <div v-if="hasToken && hasNftFields" style="margin-left: 25px;">
       <div><InfoTip text="How many NFT entries to write, counting up from the starting number. One entry per commitment, so this is the size of the collection.">Number of unique NFTs</InfoTip> *</div>
       <input v-model="numberNFTs" type="number" :class="{ invalid: issueFor('numberNFTs') }" placeholder="10">
     <div v-if="issueFor('numberNFTs')" class="fieldError">{{ issueFor('numberNFTs') }}</div>
@@ -418,7 +513,7 @@
     </div>
 
     <div><InfoTip text="The project's own site, published as the web URI. Needs the full URL including https://.">Link website</InfoTip></div>
-    <input v-model="webUrl" :class="{ invalid: issueFor('webUrl') }" placeholder="https://example.com">
+    <input v-model="webUrl" :class="{ invalid: issueFor('webUrl') }" :placeholder="copy.web">
     <div v-if="issueFor('webUrl')" class="fieldError">{{ issueFor('webUrl') }}</div>
     <div style="margin: 5px 0;"><InfoTip text="Extra places this identity lives, keyed by the spec's standard names. Each value is a full URI with its scheme, so a social link is the profile URL, not a handle.">Extra Links</InfoTip>
       <button @click="removeUri" type="button" style="padding: 3px 5px; vertical-align: text-top; margin: 0 5px;">-</button>

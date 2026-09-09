@@ -143,6 +143,8 @@ export interface Prefill {
   webUrl: string;
   listLinks: [string, string][];
   keepsNfts: boolean;
+  /** whether the identity being updated already carries a token, which cannot be undone */
+  hasToken: boolean;
   /** snapshots whose key is not a spec timestamp, so left out of the ordering */
   unorderable: number;
 }
@@ -172,6 +174,7 @@ export function prefillFrom(registry: Registry, now: string): Prefill | undefine
     webUrl: uris.web ?? "",
     listLinks: Object.entries(uris).filter(([key]) => key !== "icon" && key !== "web"),
     keepsNfts: Boolean(snapshot.token?.nfts),
+    hasToken: Boolean(snapshot.token),
     unorderable: unorderableKeys(history).length,
   };
 }

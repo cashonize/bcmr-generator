@@ -44,21 +44,30 @@ There is no test suite and no test runner installed.
 - **`src/interfaces/bcmr-v2.schema.ts`**: types transcribed from the upstream schema. Treat
   it as vendored: change it to track upstream, not to make local code typecheck.
 
+Two independent axes at the top of the form: **New registry / Update existing** is which
+job, **Advanced** is which persona. Simple self-publishes metadata for one token; advanced
+maintains a registry, and owns non-token identities (`hasToken`, which omits the whole
+`token` block) and the registry's own identity. Turning Advanced off resets both, so simple
+output stays byte-identical.
+
 The things that bite:
 
 - **Adding a form field means touching four hand-wired places**: a `ref` in `App.vue`, a
   field on `DetailsObj`, the literal in `buildDetails()`, and `generateBcmr()`, plus a rule
   in `validate.ts` if it needs one. Forgetting one is the likeliest bug here.
+- **A token identity can never become a non-token one**, since a category is a consensus
+  fact, and `mergeSnapshot` keeps `prev.token` regardless. So the kind toggle is locked
+  rather than ignored when updating an identity that already has one.
 - **Field rules guard what a typo would commit on-chain**, not just what is missing: a
-  tokenId that is not 64 hex names a garbage authbase, and a URI without a scheme (a bare
-  CID) resolves nowhere. Errors surface only after the first generate attempt, mark the
-  field, and scroll it into view, since the button sits below a long form.
+  tokenId that is not 64 hex names a garbage authbase, a URI without a scheme resolves
+  nowhere. Errors appear after the first generate attempt and scroll into view, since the
+  button sits below a long form.
 - **Every `DetailsObj` field is a `string`**, the numeric ones included; `generateBcmr()`
   does the parsing.
 - **The preview is a `computed` over the form, never a snapshot**, so it cannot disagree
-  with what downloads. The panel shows the file's SHA-256 and a BCMR publication commits
-  that hash on-chain, which is why that invariant is worth keeping. `generatedAt` is frozen
-  at the click so editing afterwards does not move `latestRevision`.
+  with what downloads. That matters because the panel shows the file's SHA-256 and a BCMR
+  publication commits that hash on-chain. `generatedAt` is frozen at the click, so editing
+  afterwards does not move `latestRevision`.
 - **Update mode carries through anything the form does not model**: other identities,
   earlier snapshots, `tags`, `locales`, `extensions`. An empty field means "leave alone",
   not "erase". The reasoning is in `updateBcmr.ts`.

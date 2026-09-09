@@ -54,13 +54,22 @@ export function validateDetails(details: DetailsObj): FieldIssue[] {
   if (!details.tokenName) add("tokenName", "Required.");
   if (!details.tokenDescription) add("tokenDescription", "Required.");
 
-  if (!details.tokenSymbol) add("tokenSymbol", "Required.");
-  else if (!SYMBOL.test(details.tokenSymbol)) {
-    add("tokenSymbol", "Capital letters, numbers and dashes only.");
+  // the registry can name its own identity by authbase instead of describing it inline
+  if (details.registryIdentityAuthbase && !HEX64.test(details.registryIdentityAuthbase)) {
+    add("registryIdentityAuthbase", "Must be exactly 64 hex characters, or leave it empty to describe the registry inline.");
   }
 
-  if (details.tokenDecimals && !integerIn(details.tokenDecimals, 0, 18)) {
-    add("tokenDecimals", "A whole number from 0 to 18.");
+  // symbol, decimals and NFTs all belong to the token block, which a non-token
+  // identity does not carry at all
+  if (details.hasToken) {
+    if (!details.tokenSymbol) add("tokenSymbol", "Required.");
+    else if (!SYMBOL.test(details.tokenSymbol)) {
+      add("tokenSymbol", "Capital letters, numbers and dashes only.");
+    }
+
+    if (details.tokenDecimals && !integerIn(details.tokenDecimals, 0, 18)) {
+      add("tokenDecimals", "A whole number from 0 to 18.");
+    }
   }
 
   if (details.iconUri && !HAS_SCHEME.test(details.iconUri)) {
@@ -70,7 +79,7 @@ export function validateDetails(details: DetailsObj): FieldIssue[] {
     add("webUrl", "Needs a scheme, for example https://...");
   }
 
-  if (details.hasNftFields) {
+  if (details.hasToken && details.hasNftFields) {
     if (!details.numberNFTs) add("numberNFTs", "Required.");
     else if (!integerIn(details.numberNFTs, 1, 100000)) add("numberNFTs", "A whole number, at least 1.");
 

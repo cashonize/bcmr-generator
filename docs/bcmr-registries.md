@@ -43,12 +43,11 @@ In **Update existing** mode, the loaded registry with one snapshot added to it; 
   removed by hand is a major and nothing in the file says so.
 - `latestRevision` and the snapshot's timestamp key are the same `new Date().toISOString()`
   string. The spec requires exactly that 24-character format.
-- `registryIdentity` is always an inline object (`{name, description}`, auto-derived as
-  `bcmr for <token name>` / `self-published bcmr for <token name>`). The spec also allows
-  an authbase **string** here, which is the recommended form: it makes the registry itself
-  an on-chain-resolvable identity. Emitting the inline object means the file describes the
-  token's identity on-chain, but the registry's own identity is authenticated only by where
-  it is hosted. This is deliberate for the self-published single-token case the app targets.
+- `registryIdentity` is an inline object (`{name, description}`) by default, auto-derived as
+  `bcmr for <token name>` / `self-published bcmr for <token name>`. Advanced mode makes both
+  fields editable, and offers the spec's other form instead: an authbase **string**, which
+  makes the registry itself an on-chain-resolvable identity rather than one authenticated
+  only by where it is hosted. The two are exclusive, which is what the spec's union means.
 - `identities[tokenId][date]` carries `name`, `description`, `token` (`category`, `symbol`,
   optional `decimals`), and `uris`.
 
@@ -73,6 +72,19 @@ a different authbase, or adds one. The identities not named are kept either way.
 
 The panel shows the hash of the file that was loaded beside the hash of the new one: the
 first is what a publication currently commits to, the second is what to publish next.
+
+## Identities that are not tokens
+
+The spec's identities are not only tokens, and `IdentitySnapshot.token` says as much:
+"Omitted for non-token identities." Advanced mode turns the token block off, which takes
+symbol, decimals and the NFT collection with it, and leaves an identity that is just a
+name, a description and its URIs. That is what a person, organization, dapp or contract
+system looks like in a registry.
+
+One rule that follows from the chain rather than from taste: a category is a consensus
+fact, so an identity that already has a token can never become one that does not. When
+updating such an identity the switch is locked rather than ignored, and `mergeSnapshot`
+keeps `prev.token` regardless.
 
 ## NFT commitments: the part that is easy to get wrong
 
@@ -128,8 +140,6 @@ What the standard enables that the generator does not do yet.
   files by hand today. Nothing written by this generator or by CashTokens Studio names more
   than one identity, which is why downstream wallets have not had to handle the case well
   either.
-- **An authbase as `registryIdentity`.** Letting the user give the registry its own
-  on-chain identity, per the spec's recommendation, instead of the inline object.
 - **The rest of the spec's optional surface.** `tags`, `license`, `locales`,
   `defaultChain` / `chains` for non-mainnet tokens, `extensions`, and identity `migrated`
   fields are typed in the vendored schema and reachable, but have no form field.

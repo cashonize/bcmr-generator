@@ -1,10 +1,11 @@
 <script setup lang="ts">
+defineProps<{ disabled?: boolean }>()
 const model = defineModel<boolean>({ required: true })
 </script>
 
 <template>
-  <label class="switch" :class="{ on: model }">
-    <input type="checkbox" role="switch" v-model="model">
+  <label class="switch" :class="{ on: model, disabled }">
+    <input type="checkbox" role="switch" v-model="model" :disabled="disabled">
     <span class="switchTrack" aria-hidden="true"></span>
     <span class="switchThumb" aria-hidden="true"></span>
   </label>
@@ -102,6 +103,15 @@ const model = defineModel<boolean>({ required: true })
    later, would keep the track grey when the toggle is on */
 :root[data-theme="dark"] .switch:not(.on) .switchTrack {
   background: #5c6166;
+}
+
+/* a locked switch still shows its state, it just cannot be moved */
+.switch.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.switch.disabled:hover .switchThumb::before {
+  transform: scale(0);
 }
 
 @media (prefers-reduced-motion: reduce) {

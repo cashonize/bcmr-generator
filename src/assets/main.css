@@ -110,9 +110,79 @@ ul {
 
 /* cashonize's .type-filter segmented pill bar: a choice between two jobs, which
    is what that control is for, rather than an on/off switch */
+/* the pill and the advanced switch are two different questions, so they sit at
+   opposite ends of the row rather than reading as one control */
+.modeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.advancedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+  color: var(--muted-color);
+  cursor: pointer;
+}
+
+.advancedBox {
+  margin-bottom: 22px;
+  padding: 14px;
+  border: 1px solid var(--color-lightGrey);
+  border-radius: 6px;
+  background: var(--bg-secondary-color);
+}
+/* the two ways to name the registry are exclusive per the spec, so the rule says so
+   and the fields above grey out once an authbase is given */
+.orRule {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0 10px;
+  color: var(--muted-color);
+  font-size: 0.85em;
+}
+/* short on purpose: a full-width rule reads as a section divider, which is what
+   step 2's border is, and made this look like another step rather than a choice */
+.orRule::before,
+.orRule::after {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: var(--color-lightGrey);
+}
+
+/* the panel holds two unrelated questions: the registry, and the identity below.
+   numbering them stops the kind toggle reading as part of the either/or above it */
+.advancedStep {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.advancedStep.stepTwo {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-lightGrey);
+}
+
+.kindRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.kindLocked {
+  font-size: 0.85em;
+  color: var(--muted-color);
+}
+
 .modePill {
   display: inline-flex;
-  margin-bottom: 8px;
   padding: 3px;
   border-radius: 20px;
   background-color: rgba(128, 128, 128, 0.12);
