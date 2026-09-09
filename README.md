@@ -14,7 +14,7 @@ There are two modes.
 
 ![Update existing mode, with a registry loaded](./screenshots/screenshot1.png)
 
-Both modes have an **Advanced** switch for when you are not self-publishing one token but maintaining a registry. It lets you name the registry itself, rather than having that derived from the token name, or identify it on-chain by authbase instead. It also turns off the token block, so you can describe a person, organization, dapp or contract system: the spec's identities are not only tokens, and nothing else writes those files today.
+Both modes have an **Advanced** switch for when you are not self-publishing one token but maintaining a registry. It lets you name the registry itself, rather than having that derived from the token name, or identify it on-chain by authbase instead. It also turns off the token block, so you can describe a person, organization, dapp or contract system: the spec's identities are not only tokens, and nothing else writes those files today. And it lets one registry name several identities, each on its own tab.
 
 ## Project Setup
 

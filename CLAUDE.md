@@ -32,29 +32,39 @@ There is no test suite and no test runner installed.
 
 ## Architecture
 
-- **`src/App.vue`**: the whole form and all its state, as flat `ref()`s. `src/components/`
-  is presentational only, and there is no store.
-- **`src/interfaces/interfaces.ts`**: `DetailsObj`, the contract between form and generator.
-- **`src/generateBcmr.ts`**: `generateBcmr()`, a pure builder and nothing else.
-- **`src/validate.ts`**: all form validation. The rest of the app depends only on
-  `validateDetails()` and `FieldIssue`, so the implementation can be swapped without
-  touching callers.
-- **`src/updateBcmr.ts`**: the Update existing mode, merging a generated snapshot into a
-  registry the user already published.
+- **`src/App.vue`**: the whole form and all its state. `identities` is an array of
+  `IdentityDraft`, one per tab, and the form binds to `current`, the active one.
+  `src/components/` is presentational only, and there is no store.
+- **`src/interfaces/interfaces.ts`**: `IdentityDraft` is one identity; `DetailsObj` is one
+  plus the registry-level fields it shares with the others, which is what the generator and
+  the validator take.
+- **`src/generateBcmr.ts`**: pure builders. `generateBcmr()` makes a one-identity registry,
+  `generateRegistry()` merges one per draft into a file naming several.
+- **`src/validate.ts`**: all form validation, behind `validateDetails()`, `FieldIssue` and
+  `duplicateAuthbaseIndexes()`. Nothing outside knows how a rule is expressed, so the
+  implementation can be swapped without touching callers.
+- **`src/updateBcmr.ts`**: the Update existing mode. Parses a registry the user already
+  published, prefills a draft per identity, and merges generated snapshots back in.
 - **`src/interfaces/bcmr-v2.schema.ts`**: types transcribed from the upstream schema. Treat
   it as vendored: change it to track upstream, not to make local code typecheck.
 
 Two independent axes at the top of the form: **New registry / Update existing** is which
 job, **Advanced** is which persona. Simple self-publishes metadata for one token; advanced
 maintains a registry, and owns non-token identities (`hasToken`, which omits the whole
-`token` block) and the registry's own identity. Turning Advanced off resets both, so simple
-output stays byte-identical.
+`token` block), the registry's own identity, and naming several identities in one file.
+Turning Advanced off resets the first two and is locked while a second identity exists, so
+simple mode still writes exactly one and its output stays byte-identical.
 
 The things that bite:
 
-- **Adding a form field means touching four hand-wired places**: a `ref` in `App.vue`, a
-  field on `DetailsObj`, the literal in `buildDetails()`, and `generateBcmr()`, plus a rule
-  in `validate.ts` if it needs one. Forgetting one is the likeliest bug here.
+- **Adding a form field means touching four hand-wired places**: `blankIdentity()` in
+  `App.vue`, a field on `IdentityDraft` (or `DetailsObj` if it is registry-level), the
+  template binding to `current`, and `generateBcmr()`, plus a rule in `validate.ts` if it
+  needs one. Forgetting one is the likeliest bug here.
+- **Validation issues carry the identity they belong to.** A failed generate switches to
+  that tab, and tabs with a problem are marked, since the field may be on one you cannot
+  see. `duplicateAuthbaseIndexes` is the only rule that spans identities: two drafts sharing
+  an authbase would collapse into one entry in the output.
 - **A token identity can never become a non-token one**, since a category is a consensus
   fact, and `mergeSnapshot` keeps `prev.token` regardless. So the kind toggle is locked
   rather than ignored when updating an identity that already has one.

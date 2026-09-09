@@ -1,9 +1,10 @@
 <script setup lang="ts">
   import { computed, nextTick, ref, watch } from "vue"
-  import { generateBcmr } from "./generateBcmr"
-  import { validateDetails } from "./validate"
-  import { parseRegistry, applyUpdate, prefillFrom, nextVersion, type Prefill } from "./updateBcmr"
+  import { generateBcmr, generateRegistry } from "./generateBcmr"
+  import { validateDetails, duplicateAuthbaseIndexes } from "./validate"
+  import { parseRegistry, applyUpdate, prefillAll, nextVersion, type Prefill } from "./updateBcmr"
   import type { Registry } from "./interfaces/bcmr-v2.schema"
+  import type { IdentityDraft } from "./interfaces/interfaces"
   import ThemeToggle from './components/ThemeToggle.vue'
   import InfoTip from './components/InfoTip.vue'
   import ToggleSwitch from './components/ToggleSwitch.vue'
@@ -12,32 +13,42 @@
   // Simple mode is self-publishing metadata for one token. Advanced is maintaining a
   // registry: identities that are not tokens, and control of the registry's own identity.
   const advanced = ref(false);
-  const hasToken = ref(true);
   const registryName = ref("");
   const registryDescription = ref("");
   const registryAuthbase = ref("");
 
-  const tokenId = ref("");
-  const tokenName = ref("");
-  const tokenDescription = ref("");
-  const tokenSymbol = ref("");
-  const iconUri = ref("");
-  const tokenDecimals = ref("");
+  // One draft per identity in the registry. Simple mode always holds exactly one; advanced
+  // adds and removes them, and the tabs pick which one the form below is editing.
+  function blankIdentity(): IdentityDraft {
+    return {
+      hasToken: true,
+      tokenId: "", tokenName: "", tokenDescription: "", tokenSymbol: "",
+      iconUri: "", tokenDecimals: "",
+      hasNftFields: false, numberNFTs: "", numbering: "vm-numbers", startingNumber: "",
+      nftName: "", nftDescription: "", nftIconUri: "", nftIconType: "", hasNftImages: false,
+      webUrl: "", listLinks: [],
+    }
+  }
 
-  const hasNftFields = ref(false);
-  const numberNFTs = ref("");
-  const numbering = ref("vm-numbers" as "hex" | "vm-numbers");
-  const startingNumber = ref("");
-  const nftName = ref("");
-  const nftDescription = ref("");
-  const nftIconUri = ref("")
-  const nftIconType = ref("");
-  const hasImages = ref(false);
+  const identities = ref<IdentityDraft[]>([blankIdentity()]);
+  const activeIndex = ref(0);
+  const current = computed(() => identities.value[activeIndex.value] ?? identities.value[0]);
 
-  const webUrl = ref("");
-  const listLinks = ref([] as ([] | [string | undefined, string | undefined])[]);
-  const addUri = () => {listLinks.value.push([])}
-  const removeUri = () => {listLinks.value.pop()}
+  function addIdentity() {
+    identities.value.push(blankIdentity());
+    activeIndex.value = identities.value.length - 1;
+  }
+  function removeIdentity(index: number) {
+    if (identities.value.length <= 1) return
+    identities.value.splice(index, 1);
+    if (activeIndex.value >= identities.value.length) activeIndex.value = identities.value.length - 1;
+  }
+  function identityLabel(draft: IdentityDraft, index: number): string {
+    return draft.tokenName || `Identity ${index + 1}`
+  }
+
+  const addUri = () => {current.value.listLinks.push([])}
+  const removeUri = () => {current.value.listLinks.pop()}
 
   // Fresh registry, or a new snapshot on one that already exists. The second is
   // what stops a returning user silently dropping their own history.
@@ -65,7 +76,8 @@
       committedHash.value = "";
       return
     }
-    const prefill = prefillFrom(result.registry, new Date().toISOString());
+    const prefills = prefillAll(result.registry, new Date().toISOString());
+    const prefill = prefills[0];
     if (!prefill) {
       loadError.value = "That registry has no identities to update.";
       loadedBase.value = null;
@@ -82,15 +94,22 @@
     versionMinor.value = String(next.minor);
     versionPatch.value = String(next.patch);
 
-    tokenId.value = prefill.authbase;
-    tokenName.value = prefill.name;
-    tokenDescription.value = prefill.description;
-    tokenSymbol.value = prefill.symbol;
-    tokenDecimals.value = prefill.decimals;
-    iconUri.value = prefill.iconUri;
-    webUrl.value = prefill.webUrl;
-    listLinks.value = prefill.listLinks.map(([key, value]) => [key, value] as [string, string]);
-    hasNftFields.value = false; // an existing nfts block is carried over as it is
+    // one tab per identity in the file, so nothing in it is edited blind. Simple mode has
+    // no tabs, so it takes only the first and the warning above says so.
+    identities.value = (advanced.value ? prefills : prefills.slice(0, 1)).map((p) => ({
+      ...blankIdentity(),
+      hasToken: p.hasToken,
+      tokenId: p.authbase,
+      tokenName: p.name,
+      tokenDescription: p.description,
+      tokenSymbol: p.symbol,
+      tokenDecimals: p.decimals,
+      iconUri: p.iconUri,
+      webUrl: p.webUrl,
+      listLinks: p.listLinks.map(([key, value]) => [key, value] as [string, string]),
+      hasNftFields: false, // an existing nfts block is carried over as it is
+    }));
+    activeIndex.value = 0;
 
     void hashBytes(new TextEncoder().encode(text)).then((hex) => { committedHash.value = hex });
   }
@@ -116,7 +135,7 @@
 
   // Every label, tip and example that changes with the kind, in one place: a token's
   // wording reads as nonsense on a contract system or an organization.
-  const copy = computed(() => hasToken.value
+  const copy = computed(() => current.value.hasToken
     ? {
         idLabel: "TokenId",
         idTip: "The token's category id: 64 hex characters, shown as the category by any wallet holding the token.",
@@ -142,14 +161,19 @@
         web: "https://acme.example",
       });
 
+  const advancedLocked = computed(() => identities.value.length > 1);
   watch(advanced, (on) => {
-    if (on) return
-    hasToken.value = true;
+    // turning it on after loading a multi-identity file picks up the rest
+    if (on) {
+      if (loadedText.value) loadRegistry(loadedText.value);
+      return
+    }
+    identities.value.forEach((draft) => { draft.hasToken = true });
     registryName.value = "";
     registryDescription.value = "";
     registryAuthbase.value = "";
   });
-  watch(tokenLocked, (locked) => { if (locked) hasToken.value = true });
+  watch(tokenLocked, (locked) => { if (locked) current.value.hasToken = true });
 
   function clearLoaded() {
     loadedText.value = "";
@@ -177,31 +201,20 @@
   const generatedAt = ref<string | null>(null);
   const validationError = ref("");
 
-  function buildDetails(date: string): DetailsObj {
+  function buildDetails(date: string, draft: IdentityDraft = current.value): DetailsObj {
     return {
+      ...draft,
       date,
-      registryIdentityName: registryName.value || `bcmr for ${tokenName.value}`,
-      registryIdentityDescription: registryDescription.value || `self-published bcmr for ${tokenName.value}`,
+      registryIdentityName: registryName.value || `bcmr for ${identities.value[0].tokenName}`,
+      registryIdentityDescription: registryDescription.value || `self-published bcmr for ${identities.value[0].tokenName}`,
       registryIdentityAuthbase: advanced.value ? registryAuthbase.value : "",
-      hasToken: advanced.value ? hasToken.value : true,
-      tokenId: tokenId.value,
-      tokenName: tokenName.value,
-      tokenDescription: tokenDescription.value,
-      tokenSymbol: tokenSymbol.value,
-      iconUri: iconUri.value,
-      tokenDecimals: tokenDecimals.value,
-      hasNftFields: hasNftFields.value,
-      numberNFTs: numberNFTs.value,
-      numbering: numbering.value,
-      startingNumber: startingNumber.value,
-      nftName: nftName.value,
-      nftDescription: nftDescription.value,
-      nftIconUri: nftIconUri.value,
-      nftIconType: nftIconType.value,
-      hasNftImages: hasImages.value,
-      webUrl: webUrl.value,
-      listLinks: listLinks.value,
+      hasToken: advanced.value ? draft.hasToken : true,
     }
+  }
+
+  /** every identity, in tab order */
+  function buildAll(date: string): DetailsObj[] {
+    return identities.value.map((draft) => buildDetails(date, draft))
   }
 
   // The preview tracks the form once it exists, so what is shown and what is
@@ -209,9 +222,23 @@
   // below is what a BCMR publication commits to on-chain.
   // held back until the first generate, so an untouched form is not a wall of red
   const showErrors = ref(false);
-  const issues = computed(() => validateDetails(buildDetails("1970-01-01T00:00:00.000Z")));
+  const issues = computed(() => {
+    const all = buildAll("1970-01-01T00:00:00.000Z");
+    const found = all.flatMap((details, index) =>
+      validateDetails(details).map((issue) => ({ ...issue, index })));
+    // two identities keyed by the same authbase would collapse into one in the output
+    for (const index of duplicateAuthbaseIndexes(all)) {
+      found.push({ index, field: "tokenId", message: "Another identity already uses this authbase." });
+    }
+    return found
+  });
   function issueFor(field: string): string | undefined {
-    return showErrors.value ? issues.value.find((i) => i.field === field)?.message : undefined
+    if (!showErrors.value) return undefined
+    return issues.value.find((i) => i.index === activeIndex.value && i.field === field)?.message
+  }
+  /** so a tab can show that the identity behind it needs attention */
+  function tabHasIssue(index: number): boolean {
+    return showErrors.value && issues.value.some((i) => i.index === index)
   }
 
   function versionPart(input: string, fallback: number): number {
@@ -220,16 +247,22 @@
   }
 
   const registry = computed(() => {
-    if (!generatedAt.value) return null
-    const fresh = generateBcmr(buildDetails(generatedAt.value));
+    const date = generatedAt.value;
+    if (!date) return null
+    const all = buildAll(date);
     const base = loadedBase.value;
-    if (!base) return fresh
+    if (!base) return generateRegistry(all)
     const fallback = nextVersion(base);
-    return applyUpdate(base, fresh, tokenId.value, generatedAt.value, {
+    const version = {
       major: versionPart(versionMajor.value, fallback.major),
       minor: versionPart(versionMinor.value, fallback.minor),
       patch: versionPart(versionPatch.value, fallback.patch),
-    })
+    };
+    // each identity in turn, so an update can add one as well as change one
+    return all.reduce(
+      (acc, draft) => applyUpdate(acc, generateBcmr(draft), draft.tokenId, date, version),
+      base,
+    )
   });
 
   const registryJson = computed(() =>
@@ -240,7 +273,7 @@
   const registryBytes = computed(() => new TextEncoder().encode(registryJson.value));
 
   const nftTypeCount = computed(() => {
-    const types = registry.value?.identities?.[tokenId.value]?.[generatedAt.value ?? ""]
+    const types = registry.value?.identities?.[current.value.tokenId]?.[generatedAt.value ?? ""]
       ?.token?.nfts?.parse.types;
     return types ? Object.keys(types).length : 0;
   });
@@ -294,7 +327,7 @@
       generatedAt.value = null;
       return
     }
-    const found = validateDetails(buildDetails(date));
+    const found = issues.value;
     if(found.length){
       validationError.value = found.length === 1
         ? "Fix the highlighted field, then generate."
@@ -302,6 +335,8 @@
       generatedAt.value = null;
       // 2. the button is at the foot of a long form, so the first bad field is
       // usually off-screen above it: take the user there rather than describing it
+      const firstIndex = found[0]?.index ?? 0;
+      if (firstIndex !== activeIndex.value) activeIndex.value = firstIndex;
       void nextTick().then(() => {
         const firstError = document.querySelector(".fieldError");
         if (!firstError) return
@@ -366,7 +401,7 @@
       </div>
       <label class="advancedToggle">
         <InfoTip text="Simple mode self-publishes metadata for one token. Advanced is for maintaining a registry: identities that are not tokens, and control of the registry's own identity rather than the name derived for you.">Advanced</InfoTip>
-        <ToggleSwitch v-model="advanced" />
+        <ToggleSwitch v-model="advanced" :disabled="advancedLocked" />
       </label>
     </div>
     <div class="modeNote">
@@ -383,9 +418,9 @@
       </div>
 
       <div>Registry name</div>
-      <input v-model="registryName" :disabled="Boolean(registryAuthbase)" :placeholder="`bcmr for ${tokenName || copy.name}`">
+      <input v-model="registryName" :disabled="Boolean(registryAuthbase)" :placeholder="`bcmr for ${identities[0].tokenName || copy.name}`">
       <div>Registry description</div>
-      <input v-model="registryDescription" :disabled="Boolean(registryAuthbase)" :placeholder="`self-published bcmr for ${tokenName || copy.name}`">
+      <input v-model="registryDescription" :disabled="Boolean(registryAuthbase)" :placeholder="`self-published bcmr for ${identities[0].tokenName || copy.name}`">
 
       <div class="orRule"><span>or</span></div>
 
@@ -395,10 +430,36 @@
       <input v-model="registryAuthbase" :class="{ invalid: issueFor('registryIdentityAuthbase') }" placeholder="its authbase, 64 hex characters">
       <div v-if="issueFor('registryIdentityAuthbase')" class="fieldError">{{ issueFor('registryIdentityAuthbase') }}</div>
 
-      <div class="advancedStep stepTwo">2. The identity you are describing</div>
-      <div class="kindRow">
+      <div class="advancedStep stepTwo">2. The identities in this registry</div>
+      <div class="identityTabs">
+        <button
+          v-for="(draft, index) of identities"
+          :key="index"
+          type="button"
+          class="identityTab"
+          :class="{ active: index === activeIndex, flagged: tabHasIssue(index) }"
+          @click="activeIndex = index"
+        >
+          {{ identityLabel(draft, index) }}
+          <span
+            v-if="identities.length > 1"
+            class="tabRemove"
+            role="button"
+            :aria-label="`Remove ${identityLabel(draft, index)}`"
+            @click.stop="removeIdentity(index)"
+          >&times;</span>
+        </button>
+        <button type="button" class="secondaryButton addIdentity" @click="addIdentity">
+          + Add another identity
+        </button>
+      </div>
+      <div v-if="advancedLocked" class="loadLead" style="margin: 8px 0 0;">
+        Advanced cannot be switched off while the registry names more than one identity,
+        since simple mode writes a single one and the rest would be dropped.
+      </div>
+      <div class="kindRow" style="margin-top: 16px;">
         <InfoTip text="Off for a person, organization, dapp or contract system: the spec omits the token block entirely for those, and symbol, decimals and NFTs go with it.">This identity has a token</InfoTip>
-        <ToggleSwitch v-model="hasToken" :disabled="tokenLocked" />
+        <ToggleSwitch v-model="current.hasToken" :disabled="tokenLocked" />
         <span v-if="tokenLocked" class="kindLocked">locked: this identity already has one, and a category is permanent</span>
       </div>
       <div class="loadLead" style="margin: 6px 0 0;">
@@ -434,10 +495,10 @@
         {{ loadedInfo.snapshotCount }} snapshot{{ loadedInfo.snapshotCount === 1 ? '' : 's' }} on this one.
         Generating adds a snapshot and bumps the minor version.
         <template v-if="loadedInfo.keepsNfts"> Its existing NFT types are carried over as they are.</template>
-        <div v-if="loadedInfo.identityCount > 1" class="loadWarning">
-          This registry names {{ loadedInfo.identityCount }} identities. The one in the
-          {{ copy.idLabel }} field below is the one being updated; the others are kept
-          exactly as they are. Authoring several identities here is not built yet.
+        <div v-if="loadedInfo.identityCount > 1 && !advanced" class="loadWarning">
+          This registry names {{ loadedInfo.identityCount }} identities, and only the first
+          is loaded into the form. Turn on Advanced to get a tab for each of them. The ones
+          you do not edit are kept exactly as they are either way.
         </div>
         <div v-if="unorderableNote" class="loadWarning">
           {{ unorderableNote.lead }} <code>YYYY-MM-DDTHH:mm:ss.sssZ</code> form.
@@ -459,70 +520,70 @@
       <span><InfoTip :text="copy.idTip">{{ copy.idLabel }}</InfoTip> *</span>
       <span class="requiredNote">* marks a required field</span>
     </div>
-    <input v-model="tokenId" :class="{ invalid: issueFor('tokenId') }" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f5b7">
+    <input v-model="current.tokenId" :class="{ invalid: issueFor('tokenId') }" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f5b7">
     <div v-if="issueFor('tokenId')" class="fieldError">{{ issueFor('tokenId') }}</div>
     <div><InfoTip :text="copy.nameTip">{{ copy.nameLabel }}</InfoTip> *</div>
-    <input  v-model="tokenName" :class="{ invalid: issueFor('tokenName') }" :placeholder="copy.name">
+    <input  v-model="current.tokenName" :class="{ invalid: issueFor('tokenName') }" :placeholder="copy.name">
     <div v-if="issueFor('tokenName')" class="fieldError">{{ issueFor('tokenName') }}</div>
     <div><InfoTip :text="copy.descriptionTip">{{ copy.descriptionLabel }}</InfoTip> *</div>
-    <input v-model="tokenDescription" :class="{ invalid: issueFor('tokenDescription') }" :placeholder="copy.description">
+    <input v-model="current.tokenDescription" :class="{ invalid: issueFor('tokenDescription') }" :placeholder="copy.description">
     <div v-if="issueFor('tokenDescription')" class="fieldError">{{ issueFor('tokenDescription') }}</div>
-    <div v-if="hasToken"><InfoTip text="Capital letters, numbers and dashes only, matching /^[-A-Z0-9]+$/ in the spec. This is the ticker wallets show next to an amount.">Token Symbol</InfoTip> *</div>
-    <input v-if="hasToken" v-model="tokenSymbol" :class="{ invalid: issueFor('tokenSymbol') }" placeholder="DOGECASH">
-    <div v-if="hasToken && issueFor('tokenSymbol')" class="fieldError">{{ issueFor('tokenSymbol') }}</div>
+    <div v-if="current.hasToken"><InfoTip text="Capital letters, numbers and dashes only, matching /^[-A-Z0-9]+$/ in the spec. This is the ticker wallets show next to an amount.">Token Symbol</InfoTip> *</div>
+    <input v-if="current.hasToken" v-model="current.tokenSymbol" :class="{ invalid: issueFor('tokenSymbol') }" placeholder="DOGECASH">
+    <div v-if="current.hasToken && issueFor('tokenSymbol')" class="fieldError">{{ issueFor('tokenSymbol') }}</div>
     <div><InfoTip text="Must be a full URI including the scheme, e.g. https://... or ipfs://... A bare domain or path will not resolve. Clients are only required to support https and ipfs.">Link Icon (https or ipfs)</InfoTip></div>
-    <input v-model="iconUri" :class="{ invalid: issueFor('iconUri') }" :placeholder="copy.icon">
+    <input v-model="current.iconUri" :class="{ invalid: issueFor('iconUri') }" :placeholder="copy.icon">
     <div v-if="issueFor('iconUri')" class="fieldError">{{ issueFor('iconUri') }}</div>
-    <div v-if="hasToken"><InfoTip text="How divisible one token is: 0 to 18. With decimals of 2 an on-chain amount of 123456 is shown as 1234.56. Leave empty for 0, which is what an NFT-only category wants.">Decimals</InfoTip> (suggested to not use more than 8)</div>
-    <input v-if="hasToken" v-model="tokenDecimals" type="number" :class="{ invalid: issueFor('tokenDecimals') }" placeholder="0">
-    <div v-if="hasToken && issueFor('tokenDecimals')" class="fieldError">{{ issueFor('tokenDecimals') }}</div>
+    <div v-if="current.hasToken"><InfoTip text="How divisible one token is: 0 to 18. With decimals of 2 an on-chain amount of 123456 is shown as 1234.56. Leave empty for 0, which is what an NFT-only category wants.">Decimals</InfoTip> (suggested to not use more than 8)</div>
+    <input v-if="current.hasToken" v-model="current.tokenDecimals" type="number" :class="{ invalid: issueFor('tokenDecimals') }" placeholder="0">
+    <div v-if="current.hasToken && issueFor('tokenDecimals')" class="fieldError">{{ issueFor('tokenDecimals') }}</div>
 
-    <div v-if="hasToken"><InfoTip text="Turn on if this category also issues NFTs. It adds an nfts block listing every NFT type by its on-chain commitment.">Has NFTs</InfoTip> <ToggleSwitch v-model="hasNftFields" /></div>
+    <div v-if="current.hasToken"><InfoTip text="Turn on if this category also issues NFTs. It adds an nfts block listing every NFT type by its on-chain commitment.">Has NFTs</InfoTip> <ToggleSwitch v-model="current.hasNftFields" /></div>
 
-    <div v-if="hasToken && hasNftFields" style="margin-left: 25px;">
+    <div v-if="current.hasToken && current.hasNftFields" style="margin-left: 25px;">
       <div><InfoTip text="How many NFT entries to write, counting up from the starting number. One entry per commitment, so this is the size of the collection.">Number of unique NFTs</InfoTip> *</div>
-      <input v-model="numberNFTs" type="number" :class="{ invalid: issueFor('numberNFTs') }" placeholder="10">
+      <input v-model="current.numberNFTs" type="number" :class="{ invalid: issueFor('numberNFTs') }" placeholder="10">
     <div v-if="issueFor('numberNFTs')" class="fieldError">{{ issueFor('numberNFTs') }}</div>
       <div><InfoTip text="How each NFT's number becomes its on-chain commitment. VM-numbers is the spec's sequential encoding and what wallets expect: it is zero-based, so NFT 1 has an empty commitment, 2 is 01, and 129 is 8000 rather than 81. Hex is plain big-endian and only for old Cashonize collections.">Numbering on-chain</InfoTip></div>
-      <select name="numbering" v-model="numbering" style="width: 350px;">
+      <select name="numbering" v-model="current.numbering" style="width: 350px;">
         <option value="vm-numbers">VM-numbers (default)</option>
         <option value="hex">hexadecimal (for old Cashonize collections)</option>
       </select>
       <div><InfoTip text="The number the first NFT carries, usually 1. It shifts both the names and the commitments, so it has to match how the collection was actually minted.">StartingNumber</InfoTip> *</div>
-      <input v-model="startingNumber" type="number" :class="{ invalid: issueFor('startingNumber') }" placeholder="1">
+      <input v-model="current.startingNumber" type="number" :class="{ invalid: issueFor('startingNumber') }" placeholder="1">
     <div v-if="issueFor('startingNumber')" class="fieldError">{{ issueFor('startingNumber') }}</div>
       <div><InfoTip text="Written for every NFT in the collection, with {i} replaced by that NFT's number: ABC #{i} becomes ABC #1, ABC #2 and so on.">NFT Name</InfoTip> * ( <code>{i}</code> will be replaced by the NFT number)</div>
-      <input v-model="nftName" :class="{ invalid: issueFor('nftName') }" placeholder="ABC collection #{i}">
+      <input v-model="current.nftName" :class="{ invalid: issueFor('nftName') }" placeholder="ABC collection #{i}">
     <div v-if="issueFor('nftName')" class="fieldError">{{ issueFor('nftName') }}</div>
       <div><InfoTip text="Same {i} substitution as the name. Optional: leave it empty and the NFTs get no description.">NFT Description</InfoTip> ( <code>{i}</code> will be replaced by the NFT number)</div>
-      <input v-model="nftDescription" placeholder="Number {i} of the ABC collection with 500 NFTs">
+      <input v-model="current.nftDescription" placeholder="Number {i} of the ABC collection with 500 NFTs">
       <b>Image folder:</b> The image folder should have the 400x400 NFT icons named as <code>1.png</code>,
       <code>2.png</code>, etc.<br />
       <span style="margin-left: 10px;">Optional high-res images should be included as <code>1-img.png</code>,
         <code>2-img.png</code>, etc.<br /></span>
       <div><InfoTip text="The folder holding the numbered images, as a full URI with its scheme and no trailing slash: each NFT's icon is this plus /1.png, /2.png and so on.">Link Image Folder (https or ipfs)</InfoTip></div>
-      <input v-model="nftIconUri" :class="{ invalid: issueFor('nftIconUri') }" placeholder="ipfs://bafybeifz7yag2hlxvmaahyo5kl5etajycxtxsryadcawzt4dgy3hrzzxdq">
+      <input v-model="current.nftIconUri" :class="{ invalid: issueFor('nftIconUri') }" placeholder="ipfs://bafybeifz7yag2hlxvmaahyo5kl5etajycxtxsryadcawzt4dgy3hrzzxdq">
     <div v-if="issueFor('nftIconUri')" class="fieldError">{{ issueFor('nftIconUri') }}</div>
       <div><InfoTip text="The file extension of the images in the folder, without the dot. It is appended to every NFT number, so all the files have to share it.">Image Type</InfoTip> (png, svg, ...)</div>
-      <input v-model="nftIconType" :class="{ invalid: issueFor('nftIconType') }" placeholder="png">
+      <input v-model="current.nftIconType" :class="{ invalid: issueFor('nftIconType') }" placeholder="png">
     <div v-if="issueFor('nftIconType')" class="fieldError">{{ issueFor('nftIconType') }}</div>
       <div>
         <InfoTip text="Adds an image URI beside each icon, pointing at {i}-img in the same folder, for wallets that can show something larger than the 400x400 icon.">Has High-resolution Image for NFTs</InfoTip> (besides 400x400px icon)
-        <ToggleSwitch v-model="hasImages" />
+        <ToggleSwitch v-model="current.hasNftImages" />
       </div>
     </div>
 
     <div><InfoTip text="The project's own site, published as the web URI. Needs the full URL including https://.">Link website</InfoTip></div>
-    <input v-model="webUrl" :class="{ invalid: issueFor('webUrl') }" :placeholder="copy.web">
+    <input v-model="current.webUrl" :class="{ invalid: issueFor('webUrl') }" :placeholder="copy.web">
     <div v-if="issueFor('webUrl')" class="fieldError">{{ issueFor('webUrl') }}</div>
     <div style="margin: 5px 0;"><InfoTip text="Extra places this identity lives, keyed by the spec's standard names. Each value is a full URI with its scheme, so a social link is the profile URL, not a handle.">Extra Links</InfoTip>
       <button @click="removeUri" type="button" style="padding: 3px 5px; vertical-align: text-top; margin: 0 5px;">-</button>
       <button @click="addUri" type="button" style="padding: 3px 5px; vertical-align: text-top;">+</button>
     </div>
 
-    <div v-for="(uriItem, index) of listLinks" v-bind:key="index">
+    <div v-for="(uriItem, index) of current.listLinks" v-bind:key="index">
       <div style="display: flex; margin-top: 10px;">
-        <select name="uriSelect"  @change="(event) => listLinks[index][0] = (event.target as HTMLInputElement).value"  style="width: 150px; display: inline-block;">
+        <select name="uriSelect"  @change="(event) => current.listLinks[index][0] = (event.target as HTMLInputElement).value"  style="width: 150px; display: inline-block;">
           <option value="">- select -</option>
           <option value="image">full image</option>
           <option value="blog">blog</option>
@@ -536,7 +597,7 @@
           <option value="youtube">youtube</option>
           <option value="instagram">instagram</option>
         </select>
-        <input placeholder="https://example.com" @input="(event) => listLinks[index][1] = (event.target as HTMLInputElement).value">
+        <input placeholder="https://example.com" @input="(event) => current.listLinks[index][1] = (event.target as HTMLInputElement).value">
       </div>
       <div v-if="issueFor(`listLinks.${index}`)" class="fieldError">{{ issueFor(`listLinks.${index}`) }}</div>
     </div>

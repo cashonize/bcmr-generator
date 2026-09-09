@@ -84,3 +84,17 @@ export function generateBcmr(details:DetailsObj):Registry {
   }
   return bcmrJsonObj as Registry;
 }
+
+/**
+ * A registry naming several identities. Each is built by generateBcmr and their
+ * `identities` maps merged; every other field comes from the first, since the
+ * registry-level ones are shared across the drafts.
+ */
+export function generateRegistry(drafts: DetailsObj[]): Registry {
+  if(!drafts.length) throw new Error("Error: a registry needs at least one identity")
+  const registry = generateBcmr(drafts[0]);
+  for(const draft of drafts.slice(1)){
+    registry.identities = { ...registry.identities, ...generateBcmr(draft).identities };
+  }
+  return registry
+}

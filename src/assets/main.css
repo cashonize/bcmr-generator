@@ -169,6 +169,55 @@ ul {
   border-top: 1px solid var(--color-lightGrey);
 }
 
+/* one tab per identity, plus the add button on the same row */
+.identityTabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.identityTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--color-lightGrey);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--font-color);
+  font-size: 0.9em;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.identityTab.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+/* a problem on a tab you are not looking at has to be visible from here */
+.identityTab.flagged:not(.active) {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+.identityTab.flagged.active {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}
+.tabRemove {
+  opacity: 0.6;
+  font-size: 1.1em;
+  line-height: 1;
+}
+.tabRemove:hover {
+  opacity: 1;
+}
+.addIdentity {
+  padding: 6px 12px;
+  font-size: 0.9em;
+}
+
 .kindRow {
   display: flex;
   align-items: center;

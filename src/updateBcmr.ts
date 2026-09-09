@@ -154,8 +154,8 @@ export interface Prefill {
  * starting point; editing the TokenId field aims the update at another one, and
  * the rest are kept either way.
  */
-export function prefillFrom(registry: Registry, now: string): Prefill | undefined {
-  const authbase = Object.keys(registry.identities ?? {})[0];
+export function prefillFrom(registry: Registry, now: string, authbase?: string): Prefill | undefined {
+  authbase ??= Object.keys(registry.identities ?? {})[0];
   if (!authbase) return undefined;
   const history = registry.identities?.[authbase] ?? {};
   const snapshot = currentSnapshot(history, now);
@@ -177,4 +177,11 @@ export function prefillFrom(registry: Registry, now: string): Prefill | undefine
     hasToken: Boolean(snapshot.token),
     unorderable: unorderableKeys(history).length,
   };
+}
+
+/** One prefill per identity in the file, in the order the registry lists them. */
+export function prefillAll(registry: Registry, now: string): Prefill[] {
+  return Object.keys(registry.identities ?? {})
+    .map((authbase) => prefillFrom(registry, now, authbase))
+    .filter((p): p is Prefill => p !== undefined)
 }

@@ -109,6 +109,20 @@ export function validateDetails(details: DetailsObj): FieldIssue[] {
   return issues
 }
 
-export function validInputs(details: DetailsObj): boolean {
-  return validateDetails(details).length === 0
+
+/**
+ * The one rule that spans identities: `identities` is keyed by authbase, so two drafts
+ * sharing one would silently collapse into a single entry in the output. Returns the
+ * indexes of the drafts that repeat an earlier one.
+ */
+export function duplicateAuthbaseIndexes(drafts: Pick<DetailsObj, "tokenId">[]): number[] {
+  const seen = new Set<string>();
+  const repeats: number[] = [];
+  drafts.forEach((draft, index) => {
+    const key = draft.tokenId.toLowerCase();
+    if (!key) return
+    if (seen.has(key)) repeats.push(index);
+    else seen.add(key);
+  });
+  return repeats
 }

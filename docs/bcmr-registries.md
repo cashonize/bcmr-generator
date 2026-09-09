@@ -86,6 +86,21 @@ fact, so an identity that already has a token can never become one that does not
 updating such an identity the switch is locked rather than ignored, and `mergeSnapshot`
 keeps `prev.token` regardless.
 
+## Several identities in one registry
+
+Advanced mode holds a tab per identity, and `generateRegistry` merges their `identities`
+maps into one file; every registry-level field comes from the shared half, so they are the
+same whichever tab wrote them. In Update existing mode each draft is applied in turn, which
+means the same pass can add a snapshot to an identity the file already had and add an
+identity it did not.
+
+`identities` is keyed by authbase, so two drafts sharing one would collapse into a single
+entry rather than erroring. `duplicateAuthbaseIndexes` catches that; it is the only rule
+that spans identities.
+
+Loading a registry gives one tab per identity it names, so nothing in the file is edited
+blind. Simple mode has no tabs, so it loads only the first and says so.
+
 ## NFT commitments: the part that is easy to get wrong
 
 When "Has NFTs" is on, the generator emits a **sequential** NFT collection: `token.nfts`
@@ -134,12 +149,6 @@ registry is free to ignore them.
 
 What the standard enables that the generator does not do yet.
 
-- **Multi-identity registries.** One registry file may name any number of identities: an
-  organization and its token, a project's several token categories, a token and the
-  registry's own identity. The form models exactly one, so anyone publishing more merges
-  files by hand today. Nothing written by this generator or by CashTokens Studio names more
-  than one identity, which is why downstream wallets have not had to handle the case well
-  either.
 - **The rest of the spec's optional surface.** `tags`, `license`, `locales`,
   `defaultChain` / `chains` for non-mainnet tokens, `extensions`, and identity `migrated`
   fields are typed in the vendored schema and reachable, but have no form field.
