@@ -1,6 +1,6 @@
 # BCMR Generator
 
-Fill-in form to create the [BCMR](https://github.com/bitjson/chip-bcmr) Json file for a CashTokens project! Deployed at [bcmr-generator.app](https://bcmr-generator.app/).
+Generate the [BCMR](https://github.com/bitjson/chip-bcmr) metadata file that gives your CashToken a name, symbol and icon. Deployed at [bcmr-generator.app](https://bcmr-generator.app/).
 
 This Json file can then be hosted on the web on a domain name you control or can be pinned on IPFS.
 

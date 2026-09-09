@@ -1,8 +1,14 @@
 {
   "name": "bcmr-generator",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
+  "description": "Generate the BCMR metadata file that gives your CashToken a name, symbol and icon",
+  "homepage": "https://bcmr-generator.app/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cashonize/bcmr-generator.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --build && vite build",
