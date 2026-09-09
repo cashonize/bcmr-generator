@@ -74,6 +74,10 @@ The things that bite:
   button sits below a long form.
 - **Every `DetailsObj` field is a `string`**, the numeric ones included; `generateBcmr()`
   does the parsing.
+- **An NFT's number is the number its commitment encodes**, in both numbering schemes.
+  `nftNumbers()` is the only place that decides, and advanced mode's `commitmentOffset` is
+  what shifts them apart. `nftEntry()` is shared by the generator and the form's preview,
+  so the preview cannot promise something the file will not contain.
 - **The preview is a `computed` over the form, never a snapshot**, so it cannot disagree
   with what downloads. That matters because the panel shows the file's SHA-256 and a BCMR
   publication commits that hash on-chain. `generatedAt` is frozen at the click, so editing

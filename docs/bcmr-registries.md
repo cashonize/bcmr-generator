@@ -109,29 +109,44 @@ collection, requires bytecode that parses each commitment and is not something t
 produces.
 
 `parse.types` is keyed by **on-chain commitment hex**, and for sequential NFTs the spec
-says each commitment is interpreted as a **VM number**. The generator offers two schemes:
+says each commitment is interpreted as a **VM number**.
 
-| Displayed # | `vm-numbers` (default) | `hex` (legacy) |
+**An NFT's number is the number its commitment encodes.** Both schemes encode the same
+number and differ only in how:
+
+| NFT number | `vm-numbers` (default) | `hex` (legacy) |
 |---|---|---|
-| 1 | `""` (empty) | `01` |
-| 2 | `01` | `02` |
-| 128 | `7f` | `80` |
-| 129 | `8000` | `81` |
-| 255 | `fe00` | `ff` |
+| 0 | `""` (empty) | `00` |
+| 1 | `01` | `01` |
+| 128 | `8000` | `80` |
+| 500 | `f401` | `01f4` |
 
-Two things follow that reliably surprise people:
+Two things still surprise people:
 
-- **NFT #1 has an empty commitment** under `vm-numbers`, because the displayed number is
-  one-based and the VM number is zero-based (`bigIntToVmNumber(BigInt(i) - 1n)`). The
-  `- 1n` is intentional; it is not an off-by-one.
+- **NFT 0 has an empty commitment**, because that is how a VM number zero is encoded.
 - **VM numbers are little-endian and sign-magnitude**, so they diverge from plain hex well
-  before they look like they should. `8000` is 128 with a `00` byte appended because a bare
-  `80` would read as negative.
+  before they look like they should. `8000` is 128 with a `00` byte appended, since a bare
+  `80` would read as negative, and `f401` is 500 with its bytes the other way round.
 
 `hex` mode is plain big-endian `i.toString(16)` zero-padded to an even length. It exists
-only for backwards compatibility with old Cashonize collections and **deviates from the
-spec**: a conforming client reading those commitments as VM numbers displays different
-numbers than the registry names. Do not offer it as anything but a legacy option.
+only for old Cashonize collections and **deviates from the spec**: a conforming client
+reads those commitments as VM numbers and so displays different numbers than the registry
+names. Do not offer it as anything but a legacy option.
+
+### The offset that used to be here
+
+`vm-numbers` once subtracted one, so the NFT named `#1` carried the empty commitment and
+`#0` encoded VM **-1**, which the spec calls discouraged. That made the same starting
+number field mean the VM number under `hex` and the VM number plus one under `vm-numbers`.
+An earlier version of this document called the offset intentional; that was inferred from
+reading the code, and the commit that introduced it gives no reason.
+
+The number and the commitment now match by default. Advanced mode has a **commitment
+offset** for a collection minted on another convention: `commitment = number + offset`,
+while names and image filenames always follow the number. An offset rather than an absolute
+first commitment, so editing the starting number cannot silently change the relationship.
+Setting it to `-1` reproduces exactly what the old behaviour produced, which is how a
+registry generated before this change is matched.
 
 ## Conventions this generator invents
 

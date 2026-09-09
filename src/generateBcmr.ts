@@ -3,6 +3,51 @@ import { bigIntToVmNumber, binToHex } from "@bitauth/libauth";
 import type { Registry, NftType } from "./interfaces/bcmr-v2.schema.js"
 import type { DetailsObj } from "./interfaces/interfaces.js";
 
+/**
+ * The on-chain commitment for one NFT, encoding the NFT's own number. Both modes encode the
+ * same number and differ only in how: vm-numbers is the spec's, little-endian and
+ * sign-magnitude, so 0 is empty and 500 is `f401`. hex is big-endian, and legacy.
+ */
+export function nftCommitment(displayNumber: number, numbering: DetailsObj["numbering"]): string {
+  if(numbering === "hex"){
+    const hex = displayNumber.toString(16);
+    return hex.length % 2 === 0 ? hex : `0${hex}`
+  }
+  return binToHex(bigIntToVmNumber(BigInt(displayNumber)))
+}
+
+function toInt(value: string, fallback: number): number {
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed
+}
+
+/**
+ * The two numbers one NFT carries: the one people see in its name and filename, and the one
+ * the chain carries in its commitment. Equal unless `commitmentOffset` shifts them.
+ */
+export function nftNumbers(details: DetailsObj, index: number): { display: number; vm: number } {
+  const display = toInt(details.startingNumber, 0) + index;
+  return { display, vm: display + toInt(details.commitmentOffset, 0) }
+}
+
+/**
+ * Everything one NFT gets, from its position in the collection. The form's preview renders
+ * this and generateBcmr writes it, so what is shown and what is generated cannot drift.
+ */
+export function nftEntry(details: DetailsObj, index: number) {
+  const { display, vm } = nftNumbers(details, index);
+  const number = display.toString();
+  return {
+    number: display,
+    vm,
+    commitment: nftCommitment(vm, details.numbering),
+    name: details.nftName.replaceAll("{i}", number),
+    description: details.nftDescription.replaceAll("{i}", number),
+    icon: `${details.nftIconUri}/${number}.${details.nftIconType}`,
+    image: details.hasNftImages ? `${details.nftIconUri}/${number}-img.${details.nftIconType}` : undefined,
+  }
+}
+
 export function generateBcmr(details:DetailsObj):Registry {
   // Generate BCMR json obj
   const bcmrJsonObj: Partial<Registry> = {
@@ -44,37 +89,23 @@ export function generateBcmr(details:DetailsObj):Registry {
   }
   if(details.hasToken && details.hasNftFields){
     snapshot.token!.nfts = {
-      description: "",
+      // optional in the spec, so omitted rather than written empty
+      ...(details.nftCollectionDescription ? { description: details.nftCollectionDescription } : {}),
       parse: {
         types: {}
       }
     };
     const NFTtypes = snapshot.token!.nfts!.parse.types;
-    const startingNumber = parseInt(details.startingNumber) ?? 1;
-    const endingNumber = startingNumber + parseInt(details.numberNFTs);
-    for(let i=startingNumber; i < endingNumber; i++){
-      const nftNameNumbered = details.nftName.replace("{i}", i.toString());
-      const nftDescriptionNumbered = details.nftDescription.replace("{i}", i.toString());
-      let nftCommitment
-      if(details.numbering === "hex"){
-        nftCommitment = i.toString(16);
-        if(nftCommitment.length % 2 != 0) nftCommitment = `0${nftCommitment}`;
-      } else {
-        const vmNumber = bigIntToVmNumber(BigInt(i) - 1n);
-        nftCommitment = binToHex(vmNumber);
+    const count = toInt(details.numberNFTs, 0);
+    for(let index = 0; index < count; index++){
+      const entry = nftEntry(details, index);
+      const newNftItem: NftType = {
+        "name": entry.name,
+        "description": entry.description,
+        "uris": { "icon": entry.icon },
       }
-      const newNftItem: NftType= {
-        "name": nftNameNumbered,
-        "description": nftDescriptionNumbered ,
-        "uris": {
-          "icon": details.nftIconUri + `/${i}.${details.nftIconType}`
-        }
-      }
-      if(details.hasNftImages){
-        if(!newNftItem.uris) throw new Error("Error in newNftItem.uris")
-        newNftItem.uris.image = details.nftIconUri + `/${i}-img.${details.nftIconType}`
-      }
-      NFTtypes[nftCommitment] = newNftItem
+      if(entry.image) newNftItem.uris!.image = entry.image;
+      NFTtypes[entry.commitment] = newNftItem
     }
   }
   if(!snapshot?.uris) snapshot.uris = {}

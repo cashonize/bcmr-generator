@@ -9,9 +9,18 @@ export interface IdentityDraft {
   iconUri: string
   tokenDecimals: string
   hasNftFields: boolean
+  /** what the collection is for, the spec's `token.nfts.description` */
+  nftCollectionDescription: string
   numberNFTs: string
   numbering: "hex" | "vm-numbers"
+  /** the number in names and image filenames for the first NFT */
   startingNumber: string
+  /**
+   * How far an NFT's commitment sits from its number: commitment = number + offset. Empty
+   * or 0 means they match. An offset rather than an absolute first commitment, so editing
+   * the starting number does not silently change the relationship.
+   */
+  commitmentOffset: string
   nftName: string
   nftDescription: string
   nftIconUri: string

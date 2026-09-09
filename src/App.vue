@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { computed, nextTick, ref, watch } from "vue"
-  import { generateBcmr, generateRegistry } from "./generateBcmr"
+  import { generateBcmr, generateRegistry, nftEntry } from "./generateBcmr"
   import { validateDetails, duplicateAuthbaseIndexes } from "./validate"
   import { parseRegistry, applyUpdate, prefillAll, nextVersion, type Prefill } from "./updateBcmr"
   import type { Registry } from "./interfaces/bcmr-v2.schema"
@@ -24,8 +24,13 @@
       hasToken: true,
       tokenId: "", tokenName: "", tokenDescription: "", tokenSymbol: "",
       iconUri: "", tokenDecimals: "",
-      hasNftFields: false, numberNFTs: "", numbering: "vm-numbers", startingNumber: "",
-      nftName: "", nftDescription: "", nftIconUri: "", nftIconType: "", hasNftImages: false,
+      hasNftFields: false, nftCollectionDescription: "", numberNFTs: "", numbering: "vm-numbers", startingNumber: "1",
+      commitmentOffset: "",
+      nftName: "", nftDescription: "", nftIconUri: "",
+      // the spec names no image format; png is this app's convention, and an empty type
+      // would leave every icon URI ending in a bare dot
+      nftIconType: "png",
+      hasNftImages: false,
       webUrl: "", listLinks: [],
     }
   }
@@ -220,6 +225,32 @@
   // The preview tracks the form once it exists, so what is shown and what is
   // downloaded can never drift apart. That matters more than usual here: the hash
   // below is what a BCMR publication commits to on-chain.
+  // The range the two count fields actually describe, which neither of them states.
+  const nftRange = computed(() => {
+    const start = parseInt(current.value.startingNumber, 10);
+    const count = parseInt(current.value.numberNFTs, 10);
+    if (Number.isNaN(start) || Number.isNaN(count) || count < 1) return null
+    return { first: start, last: start + count - 1, count }
+  });
+
+  // The first two and the last NFT as they will actually be written. Rendered from
+  // nftEntry, the same function generateBcmr uses, so this cannot promise something
+  // the file does not contain.
+  const nftPreview = computed(() => {
+    const range = nftRange.value;
+    if (!range || !current.value.hasNftFields) return []
+    const details = buildDetails("1970-01-01T00:00:00.000Z");
+    const indexes = [0, 1, range.count - 1].filter((n, i, all) => n < range.count && all.indexOf(n) === i);
+    return indexes.map((index) => nftEntry(details, index))
+  });
+
+  /** the NFTs between the sample rows, so the gap can be stated rather than implied */
+  const hiddenNftCount = computed(() => {
+    const range = nftRange.value;
+    if (!range) return 0
+    return Math.max(0, range.count - nftPreview.value.length)
+  });
+
   // held back until the first generate, so an untouched form is not a wall of red
   const showErrors = ref(false);
   const issues = computed(() => {
@@ -540,36 +571,99 @@
 
     <div v-if="current.hasToken"><InfoTip text="Turn on if this category also issues NFTs. It adds an nfts block listing every NFT type by its on-chain commitment.">Has NFTs</InfoTip> <ToggleSwitch v-model="current.hasNftFields" /></div>
 
-    <div v-if="current.hasToken && current.hasNftFields" style="margin-left: 25px;">
-      <div><InfoTip text="How many NFT entries to write, counting up from the starting number. One entry per commitment, so this is the size of the collection.">Number of unique NFTs</InfoTip> *</div>
-      <input v-model="current.numberNFTs" type="number" :class="{ invalid: issueFor('numberNFTs') }" placeholder="10">
-    <div v-if="issueFor('numberNFTs')" class="fieldError">{{ issueFor('numberNFTs') }}</div>
-      <div><InfoTip text="How each NFT's number becomes its on-chain commitment. VM-numbers is the spec's sequential encoding and what wallets expect: it is zero-based, so NFT 1 has an empty commitment, 2 is 01, and 129 is 8000 rather than 81. Hex is plain big-endian and only for old Cashonize collections.">Numbering on-chain</InfoTip></div>
-      <select name="numbering" v-model="current.numbering" style="width: 350px;">
-        <option value="vm-numbers">VM-numbers (default)</option>
-        <option value="hex">hexadecimal (for old Cashonize collections)</option>
-      </select>
-      <div><InfoTip text="The number the first NFT carries, usually 1. It shifts both the names and the commitments, so it has to match how the collection was actually minted.">StartingNumber</InfoTip> *</div>
-      <input v-model="current.startingNumber" type="number" :class="{ invalid: issueFor('startingNumber') }" placeholder="1">
-    <div v-if="issueFor('startingNumber')" class="fieldError">{{ issueFor('startingNumber') }}</div>
-      <div><InfoTip text="Written for every NFT in the collection, with {i} replaced by that NFT's number: ABC #{i} becomes ABC #1, ABC #2 and so on.">NFT Name</InfoTip> * ( <code>{i}</code> will be replaced by the NFT number)</div>
+    <div v-if="current.hasToken && current.hasNftFields" class="nftBox">
+
+      <div class="nftGroup">How many</div>
+      <div class="nftPair">
+        <div>
+          <div><InfoTip text="How many NFT entries to write, counting up from the starting number. One entry per commitment, so this is the size of the collection.">Number of unique NFTs</InfoTip> *</div>
+          <input v-model="current.numberNFTs" type="number" :class="{ invalid: issueFor('numberNFTs') }" placeholder="500">
+        </div>
+        <div>
+          <div><InfoTip text="The number the first NFT carries, usually 1. It shifts both the names and the commitments, so it has to match how the collection was actually minted.">Starting number</InfoTip> *</div>
+          <input v-model="current.startingNumber" type="number" :class="{ invalid: issueFor('startingNumber') }" placeholder="1">
+        </div>
+      </div>
+      <div v-if="issueFor('numberNFTs')" class="fieldError">{{ issueFor('numberNFTs') }}</div>
+      <div v-if="issueFor('startingNumber')" class="fieldError">{{ issueFor('startingNumber') }}</div>
+      <div v-if="nftRange" class="nftRange">
+        NFTs {{ nftRange.first.toLocaleString() }} to {{ nftRange.last.toLocaleString() }}
+      </div>
+
+      <div class="nftGroup">Names and descriptions</div>
+      <div><InfoTip text="One sentence about the collection as a whole, which the spec describes as how this identity uses NFTs. Interfaces may elide it beyond 160 characters. Optional, and separate from the per-NFT description below.">What these NFTs are for</InfoTip></div>
+      <input v-model="current.nftCollectionDescription" placeholder="Tickets to the ABC conference, granting access to the talks and events.">
+      <div><InfoTip text="Written for every NFT in the collection, with {i} replaced by that NFT's number.">NFT Name</InfoTip> *</div>
       <input v-model="current.nftName" :class="{ invalid: issueFor('nftName') }" placeholder="ABC collection #{i}">
-    <div v-if="issueFor('nftName')" class="fieldError">{{ issueFor('nftName') }}</div>
-      <div><InfoTip text="Same {i} substitution as the name. Optional: leave it empty and the NFTs get no description.">NFT Description</InfoTip> ( <code>{i}</code> will be replaced by the NFT number)</div>
-      <input v-model="current.nftDescription" placeholder="Number {i} of the ABC collection with 500 NFTs">
-      <b>Image folder:</b> The image folder should have the 400x400 NFT icons named as <code>1.png</code>,
-      <code>2.png</code>, etc.<br />
-      <span style="margin-left: 10px;">Optional high-res images should be included as <code>1-img.png</code>,
-        <code>2-img.png</code>, etc.<br /></span>
+      <div v-if="issueFor('nftName')" class="fieldError">{{ issueFor('nftName') }}</div>
+      <div><InfoTip text="Same {i} substitution as the name. Optional: leave it empty and the NFTs get no description.">NFT Description</InfoTip></div>
+      <input v-model="current.nftDescription" placeholder="Number {i} of the ABC collection">
+
+      <div class="nftGroup">Where the images are</div>
       <div><InfoTip text="The folder holding the numbered images, as a full URI with its scheme and no trailing slash: each NFT's icon is this plus /1.png, /2.png and so on.">Link Image Folder (https or ipfs)</InfoTip></div>
       <input v-model="current.nftIconUri" :class="{ invalid: issueFor('nftIconUri') }" placeholder="ipfs://bafybeifz7yag2hlxvmaahyo5kl5etajycxtxsryadcawzt4dgy3hrzzxdq">
-    <div v-if="issueFor('nftIconUri')" class="fieldError">{{ issueFor('nftIconUri') }}</div>
+      <div v-if="issueFor('nftIconUri')" class="fieldError">{{ issueFor('nftIconUri') }}</div>
       <div><InfoTip text="The file extension of the images in the folder, without the dot. It is appended to every NFT number, so all the files have to share it.">Image Type</InfoTip> (png, svg, ...)</div>
       <input v-model="current.nftIconType" :class="{ invalid: issueFor('nftIconType') }" placeholder="png">
-    <div v-if="issueFor('nftIconType')" class="fieldError">{{ issueFor('nftIconType') }}</div>
-      <div>
-        <InfoTip text="Adds an image URI beside each icon, pointing at {i}-img in the same folder, for wallets that can show something larger than the 400x400 icon.">Has High-resolution Image for NFTs</InfoTip> (besides 400x400px icon)
+      <div v-if="issueFor('nftIconType')" class="fieldError">{{ issueFor('nftIconType') }}</div>
+      <div class="kindRow" style="margin-top: 12px;">
+        <InfoTip text="Adds a second, larger image beside each 400x400 icon, named {i}-img in the same folder.">High-resolution images as well</InfoTip>
         <ToggleSwitch v-model="current.hasNftImages" />
+      </div>
+
+      <template v-if="advanced">
+        <div class="nftGroup">Numbering on-chain</div>
+        <select name="numbering" v-model="current.numbering" style="width: 350px;">
+          <option value="vm-numbers">VM-numbers (default)</option>
+          <option value="hex">hexadecimal (for old Cashonize collections)</option>
+        </select>
+        <div class="loadLead" style="margin: 6px 0 10px;">
+          VM-numbers is the spec's sequential encoding and what wallets expect. Hex is only
+          for regenerating a collection that was minted with the old Cashonize numbering.
+        </div>
+        <div>
+          <InfoTip text="How far each commitment sits from the NFT's number: commitment = number + offset. Leave it 0 and they match. Use -1 for a collection whose commitments run one behind its names, which is what this tool produced before.">Commitment offset</InfoTip>
+        </div>
+        <input v-model="current.commitmentOffset" type="number" :class="{ invalid: issueFor('commitmentOffset') }" placeholder="0">
+        <div v-if="issueFor('commitmentOffset')" class="fieldError">{{ issueFor('commitmentOffset') }}</div>
+        <div v-if="nftPreview.length && nftPreview[0].vm !== nftPreview[0].number" class="nftRange">
+          NFT {{ nftPreview[0].number.toLocaleString() }} will carry commitment
+          {{ nftPreview[0].vm.toLocaleString() }}
+        </div>
+      </template>
+
+      <div v-if="nftPreview.length" class="nftPreview">
+        <div class="nftPreviewHead">What you will get</div>
+        <table class="nftPreviewTable">
+          <thead>
+            <tr><th>NFT</th><th>Name</th><th>Commitment</th><th>Files</th></tr>
+          </thead>
+          <tbody>
+            <template v-for="(entry, row) of nftPreview" :key="entry.number">
+            <tr>
+              <td>{{ entry.number.toLocaleString() }}</td>
+              <td>{{ entry.name || "—" }}</td>
+              <td class="nftCommitment">
+                <code>{{ entry.commitment === "" ? "(empty)" : entry.commitment }}</code>
+                <span class="vmDecode">= {{ entry.vm.toLocaleString() }}</span>
+              </td>
+              <td class="nftPreviewUri">
+                <div class="uriLine"><span class="uriKey">icon</span>{{ entry.icon }}</div>
+                <div v-if="entry.image" class="uriLine"><span class="uriKey">image</span>{{ entry.image }}</div>
+              </td>
+            </tr>
+            <tr v-if="row === 1 && hiddenNftCount > 0" class="nftGap">
+              <td colspan="4">… {{ hiddenNftCount.toLocaleString() }} more, the same shape</td>
+            </tr>
+            </template>
+          </tbody>
+        </table>
+        <div class="loadLead" style="margin: 8px 0 0;">
+          The image folder needs every file listed above, named exactly so. <code>icon</code>
+          and <code>image</code> are the URI names the spec uses, and are what they will be
+          called in the file. Under the commitment is the number it encodes, which is the
+          NFT's own number unless Advanced maps them apart.
+        </div>
       </div>
     </div>
 

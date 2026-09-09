@@ -61,13 +61,10 @@ export function unorderableKeys(history: IdentityHistory): string[] {
 }
 
 /**
- * The spec's current snapshot: the latest one not after now.
- *
- * Picking it relies on ISO timestamps sorting chronologically, which only holds for
- * the exact zero-padded form, so a key that is not in that form is left out of the
- * ordering rather than allowed to sort into the wrong place and hand back the wrong
- * snapshot to merge onto. Such keys are still carried through to the output untouched;
- * they are only excluded from deciding which snapshot is current.
+ * The spec's current snapshot: the latest one not after now. Sorting relies on ISO
+ * timestamps ordering chronologically, which only holds for the exact zero-padded form, so
+ * a key not in that form is left out of the ordering rather than sorting into the wrong
+ * place. Those keys are still carried through to the output untouched.
  */
 export function currentSnapshot(history: IdentityHistory, now: string): IdentitySnapshot | undefined {
   const key = Object.keys(history).filter((k) => isSpecTimestamp(k) && k <= now).sort().pop();

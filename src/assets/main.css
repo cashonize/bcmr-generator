@@ -169,6 +169,100 @@ ul {
   border-top: 1px solid var(--color-lightGrey);
 }
 
+/* ==========================================================================
+   NFT collection
+   ========================================================================== */
+
+.nftBox {
+  margin: 10px 0 4px 25px;
+  padding-left: 14px;
+  border-left: 2px solid var(--color-lightGrey);
+}
+.nftGroup {
+  margin: 18px 0 6px;
+  font-weight: 600;
+}
+.nftGroup:first-child {
+  margin-top: 0;
+}
+/* the two count fields belong together, so they share a row */
+.nftPair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.nftPair > div {
+  flex: 1 1 180px;
+}
+/* the one reassuring fact the two fields never state on their own */
+.nftRange {
+  margin-top: 6px;
+  color: var(--color-primary);
+  font-size: 0.9em;
+}
+
+/* what the collection will actually contain, rather than a description of it */
+.nftPreview {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-lightGrey);
+  border-radius: 6px;
+  background: var(--bg-secondary-color);
+}
+.nftPreviewHead {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.nftPreviewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.nftPreviewTable th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted-color);
+  padding: 0 10px 4px 0;
+}
+.nftPreviewTable td {
+  vertical-align: top;
+  padding: 7px 10px 7px 0;
+}
+/* a cell can hold two files, so the rows need a line between them or they blur together */
+.nftPreviewTable tbody tr + tr td {
+  border-top: 1px solid var(--color-lightGrey);
+}
+.nftCommitment {
+  white-space: nowrap;
+}
+/* the decoded commitment, on the same line as the hex: vm-numbers is little-endian, so
+   f401 reading as 500 is not obvious, and a mapping set in Advanced shows up here */
+.vmDecode {
+  margin-left: 6px;
+  font-size: 0.9em;
+  color: var(--muted-color);
+}
+/* the sample skips the middle of the collection, so the skip is stated, not implied */
+.nftGap td {
+  color: var(--muted-color);
+  font-style: italic;
+}
+
+.nftPreviewUri {
+  font-family: var(--font-family-mono);
+  color: var(--muted-color);
+  overflow-wrap: anywhere;
+}
+.uriLine + .uriLine {
+  margin-top: 3px;
+}
+/* the URI's name in the spec, so the preview also says what the field is called */
+.uriKey {
+  display: inline-block;
+  min-width: 3.6em;
+  color: var(--color-primary);
+}
+
 /* one tab per identity, plus the add button on the same row */
 .identityTabs {
   display: flex;

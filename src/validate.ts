@@ -2,18 +2,12 @@
 import type { DetailsObj } from "./interfaces/interfaces.js";
 
 /**
- * Form validation. The only validation in the app, kept here so generateBcmr stays
- * purely a builder.
+ * The only validation in the app, so generateBcmr stays purely a builder. Nothing outside
+ * knows how a rule is expressed, so swapping the implementation means rewriting
+ * `validateDetails` and leaving its signature alone.
  *
- * The contract the rest of the app depends on is just the two exports below, and
- * `FieldIssue`. Nothing outside this file knows how a rule is expressed, so swapping
- * the implementation (for a schema library, say) means rewriting `validateDetails`
- * and leaving its signature alone.
- *
- * Everything here guards the same thing: the output's hash is what a BCMR
- * publication commits to on-chain, so a value that is merely wrong rather than
- * missing still ends up committed, and correcting it costs another authchain
- * transaction.
+ * Every rule guards the same thing: the output's hash gets committed on-chain, so a value
+ * that is wrong rather than missing is committed too, and correcting it costs a transaction.
  */
 
 export interface FieldIssue {
@@ -28,10 +22,8 @@ const HEX64 = /^[0-9a-fA-F]{64}$/;
 const SYMBOL = /^[-A-Z0-9]+$/;
 
 /**
- * The spec asks for a protocol prefix and says clients need only support https and
- * ipfs, though any scheme may be specified. So this checks that a scheme is present
- * rather than allow-listing two: what it is really catching is a bare CID or a bare
- * domain pasted into a URI field, which no client can resolve.
+ * The spec allows any scheme but requires one, so this checks a scheme is present rather
+ * than allow-listing two. What it catches is a bare CID or domain, which resolves nowhere.
  */
 const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -84,9 +76,17 @@ export function validateDetails(details: DetailsObj): FieldIssue[] {
     else if (!integerIn(details.numberNFTs, 1, 100000)) add("numberNFTs", "A whole number, at least 1.");
 
     if (!details.startingNumber) add("startingNumber", "Required.");
-    else if (!integerIn(details.startingNumber, 1, 1000000000)) {
-      // 0 would make the first NFT a negative VM number, which the spec discourages
-      add("startingNumber", "A whole number, at least 1.");
+    else if (!integerIn(details.startingNumber, 0, 1000000000)) {
+      // 0 is allowed and encodes the empty commitment; the number is the VM number
+      add("startingNumber", "A whole number, 0 or more.");
+    }
+
+    const offset = details.commitmentOffset.trim();
+    if (offset !== "" && !/^-?\d+$/.test(offset)) {
+      add("commitmentOffset", "A whole number, positive or negative, or leave it empty.");
+    } else if (offset !== "" && Number(details.startingNumber) + Number(offset) < 0) {
+      // the spec discourages a negative VM number, and the offset is what could produce one
+      add("commitmentOffset", "This would give the first NFT a negative commitment, which the spec discourages.");
     }
 
     if (!details.nftName) add("nftName", "Required.");
@@ -94,7 +94,10 @@ export function validateDetails(details: DetailsObj): FieldIssue[] {
     if (details.nftIconUri && !HAS_SCHEME.test(details.nftIconUri)) {
       add("nftIconUri", "Needs a scheme, for example ipfs://... A bare CID will not resolve.");
     }
-    if (details.nftIconType && !EXTENSION.test(details.nftIconType)) {
+    if (!details.nftIconType && details.nftIconUri) {
+      // without it every icon URI ends in a bare dot
+      add("nftIconType", "Required once an image folder is given: the extension the files share.");
+    } else if (details.nftIconType && !EXTENSION.test(details.nftIconType)) {
       add("nftIconType", "Just the extension, with no dot: png, svg, jpg.");
     }
   }
