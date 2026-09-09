@@ -70,7 +70,14 @@
   const versionMinor = ref("");
   const versionPatch = ref("");
 
+  let loadingRegistry = false;
   function loadRegistry(text: string) {
+    if (loadingRegistry) return
+    loadingRegistry = true;
+    try { loadRegistryInner(text) } finally { loadingRegistry = false }
+  }
+
+  function loadRegistryInner(text: string) {
     loadedText.value = text;
     if (!text.trim()) { clearLoaded(); return }
     const result = parseRegistry(text);
@@ -101,23 +108,56 @@
 
     // one tab per identity in the file, so nothing in it is edited blind. Simple mode has
     // no tabs, so it takes only the first and the warning above says so.
-    identities.value = (advanced.value ? prefills : prefills.slice(0, 1)).map((p) => ({
-      ...blankIdentity(),
-      hasToken: p.hasToken,
-      tokenId: p.authbase,
-      tokenName: p.name,
-      tokenDescription: p.description,
-      tokenSymbol: p.symbol,
-      tokenDecimals: p.decimals,
-      iconUri: p.iconUri,
-      webUrl: p.webUrl,
-      listLinks: p.listLinks.map(([key, value]) => [key, value] as [string, string]),
-      hasNftFields: false, // an existing nfts block is carried over as it is
-    }));
+    identities.value = (advanced.value ? prefills : prefills.slice(0, 1)).map((p) => {
+      const shape = p.nftShape;
+      const offset = shape?.offset ?? 0;
+      return {
+        ...blankIdentity(),
+        hasToken: p.hasToken,
+        tokenId: p.authbase,
+        tokenName: p.name,
+        tokenDescription: p.description,
+        tokenSymbol: p.symbol,
+        tokenDecimals: p.decimals,
+        iconUri: p.iconUri,
+        webUrl: p.webUrl,
+        listLinks: p.listLinks.map(([key, value]) => [key, value] as [string, string]),
+        // left off, so the existing nfts block is carried over rather than rebuilt. The
+        // settings are armed from what is already minted, so turning it on matches.
+        hasNftFields: false,
+        numbering: shape?.numbering ?? "vm-numbers",
+        startingNumber: shape ? String(shape.first - offset) : "1",
+        numberNFTs: shape?.contiguous ? String(shape.count) : "",
+        commitmentOffset: offset === 0 ? "" : String(offset),
+      }
+    });
     activeIndex.value = 0;
+
+    // hex numbering and a non-zero offset only have a control in advanced mode, so leaving
+    // them applied but invisible would hide a setting that changes the output
+    const needsAdvanced = prefills.some((p) =>
+      p.nftShape && ((p.nftShape.numbering === "hex" && !p.nftShape.ambiguous) || (p.nftShape.offset ?? 0) !== 0));
+    if (needsAdvanced) advanced.value = true;
 
     void hashBytes(new TextEncoder().encode(text)).then((hex) => { committedHash.value = hex });
   }
+
+  /** what the loaded collection uses, said plainly, since it changes what regenerating writes */
+  const nftShapeNotes = computed(() => {
+    const shape = loadedInfo.value?.nftShape;
+    if (!shape) return []
+    const notes: { text: string; warn: boolean }[] = [];
+    if (shape.numbering === "hex" && !shape.ambiguous) {
+      notes.push({ warn: false, text: "Its commitments are hexadecimal, not the spec's VM-numbers, so the numbering has been set to hex to match." });
+    }
+    if ((shape.offset ?? 0) !== 0) {
+      notes.push({ warn: false, text: `Its commitments run ${Math.abs(shape.offset as number)} ${Math.abs(shape.offset as number) === 1 ? "step" : "steps"} ${(shape.offset as number) < 0 ? "behind" : "ahead of"} the numbers in its names, so the commitment offset has been set to ${shape.offset}.` });
+    }
+    if (!shape.contiguous) {
+      notes.push({ warn: true, text: `Its ${shape.count.toLocaleString()} NFTs do not run in an unbroken sequence from ${shape.first.toLocaleString()} to ${shape.last.toLocaleString()}, so this form cannot reproduce them. Leave Has NFTs off and the collection is carried over untouched; turning it on would replace it with an unbroken run.` });
+    }
+    return notes
+  });
 
   // a count of one reads badly through inline ternaries, so the whole sentence agrees here
   const unorderableNote = computed(() => {
@@ -530,6 +570,9 @@
           This registry names {{ loadedInfo.identityCount }} identities, and only the first
           is loaded into the form. Turn on Advanced to get a tab for each of them. The ones
           you do not edit are kept exactly as they are either way.
+        </div>
+        <div v-for="(note, i) of nftShapeNotes" :key="i" :class="note.warn ? 'loadWarning' : 'loadSummary'">
+          {{ note.text }}
         </div>
         <div v-if="unorderableNote" class="loadWarning">
           {{ unorderableNote.lead }} <code>YYYY-MM-DDTHH:mm:ss.sssZ</code> form.

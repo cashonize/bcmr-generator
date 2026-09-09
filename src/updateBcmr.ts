@@ -1,4 +1,5 @@
 
+import { hexToBin, vmNumberToBigInt } from "@bitauth/libauth";
 import type { Registry, IdentitySnapshot, IdentityHistory } from "./interfaces/bcmr-v2.schema.js";
 
 /**
@@ -142,6 +143,8 @@ export interface Prefill {
   keepsNfts: boolean;
   /** whether the identity being updated already carries a token, which cannot be undone */
   hasToken: boolean;
+  /** how its existing NFT collection is numbered, so extending it can match */
+  nftShape?: NftShape;
   /** snapshots whose key is not a spec timestamp, so left out of the ordering */
   unorderable: number;
 }
@@ -172,6 +175,7 @@ export function prefillFrom(registry: Registry, now: string, authbase?: string):
     listLinks: Object.entries(uris).filter(([key]) => key !== "icon" && key !== "web"),
     keepsNfts: Boolean(snapshot.token?.nfts),
     hasToken: Boolean(snapshot.token),
+    nftShape: snapshot.token?.nfts ? detectNftShape(snapshot.token.nfts.parse.types) : undefined,
     unorderable: unorderableKeys(history).length,
   };
 }
@@ -181,4 +185,68 @@ export function prefillAll(registry: Registry, now: string): Prefill[] {
   return Object.keys(registry.identities ?? {})
     .map((authbase) => prefillFrom(registry, now, authbase))
     .filter((p): p is Prefill => p !== undefined)
+}
+
+/**
+ * What an existing NFT collection was numbered with, so extending it does not silently
+ * use different commitments than the ones already minted.
+ *
+ * `offset` is null when it cannot be derived: the names have to carry a number and the gap
+ * between it and the commitment has to be the same for every entry.
+ */
+export interface NftShape {
+  numbering: "vm-numbers" | "hex";
+  /** true when both schemes would encode these numbers identically, so the choice is moot */
+  ambiguous: boolean;
+  first: number;
+  last: number;
+  count: number;
+  /** false when the numbers skip, which this app cannot reproduce */
+  contiguous: boolean;
+  offset: number | null;
+}
+
+function decodeHex(key: string): number {
+  return key === "" ? NaN : parseInt(key, 16)
+}
+
+function decodeVm(key: string): number {
+  const value = vmNumberToBigInt(hexToBin(key));
+  return typeof value === "bigint" ? Number(value) : NaN
+}
+
+export function detectNftShape(types: Record<string, { name?: string }>): NftShape | undefined {
+  const keys = Object.keys(types);
+  if (!keys.length) return undefined
+
+  // A bare byte of 0x80 or more cannot be a VM number, which would append a 00 to keep it
+  // positive, so it is big-endian hex. An empty commitment is VM zero, which hex writes 00.
+  const mustBeHex = keys.some((k) => k.length === 2 && parseInt(k, 16) >= 0x80);
+  const mustBeVm = keys.some((k) => k === "" || k.length > 2);
+  const numbering: NftShape["numbering"] = mustBeHex && !mustBeVm ? "hex" : "vm-numbers";
+  const ambiguous = !mustBeHex && !mustBeVm;
+
+  const decode = numbering === "hex" ? decodeHex : decodeVm;
+  const numbers = keys.map(decode);
+  if (numbers.some((n) => Number.isNaN(n))) return undefined
+  numbers.sort((a, b) => a - b);
+
+  const first = numbers[0];
+  const last = numbers[numbers.length - 1];
+
+  // the same gap between every name's number and its commitment, or nothing
+  let offset: number | null = null;
+  const gaps = keys.map((key) => {
+    const digits = types[key].name?.match(/(\d+)(?!.*\d)/);
+    if (!digits) return null
+    return decode(key) - Number(digits[1])
+  });
+  if (gaps.every((g) => g !== null) && new Set(gaps).size === 1) offset = gaps[0] as number;
+
+  return {
+    numbering, ambiguous, first, last,
+    count: numbers.length,
+    contiguous: numbers.length === last - first + 1,
+    offset,
+  }
 }
