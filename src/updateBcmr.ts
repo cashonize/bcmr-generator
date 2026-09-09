@@ -45,9 +45,32 @@ export function parseRegistry(text: string): ParseResult {
   return { registry: parsed as unknown as Registry };
 }
 
-/** The spec's current snapshot: the latest one not after now. ISO timestamps sort chronologically. */
+/**
+ * The spec's timestamp: exactly what Date.toISOString() produces. The regex fixes the
+ * shape and Date.parse rejects an impossible date the shape allows, like month 13.
+ */
+const SPEC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+export function isSpecTimestamp(key: string): boolean {
+  return SPEC_TIMESTAMP.test(key) && !Number.isNaN(Date.parse(key))
+}
+
+/** Snapshot keys that cannot be ordered, so cannot be reasoned about below. */
+export function unorderableKeys(history: IdentityHistory): string[] {
+  return Object.keys(history).filter((k) => !isSpecTimestamp(k))
+}
+
+/**
+ * The spec's current snapshot: the latest one not after now.
+ *
+ * Picking it relies on ISO timestamps sorting chronologically, which only holds for
+ * the exact zero-padded form, so a key that is not in that form is left out of the
+ * ordering rather than allowed to sort into the wrong place and hand back the wrong
+ * snapshot to merge onto. Such keys are still carried through to the output untouched;
+ * they are only excluded from deciding which snapshot is current.
+ */
 export function currentSnapshot(history: IdentityHistory, now: string): IdentitySnapshot | undefined {
-  const key = Object.keys(history).filter((k) => k <= now).sort().pop();
+  const key = Object.keys(history).filter((k) => isSpecTimestamp(k) && k <= now).sort().pop();
   return key ? history[key] : undefined;
 }
 
@@ -120,6 +143,8 @@ export interface Prefill {
   webUrl: string;
   listLinks: [string, string][];
   keepsNfts: boolean;
+  /** snapshots whose key is not a spec timestamp, so left out of the ordering */
+  unorderable: number;
 }
 
 /**
@@ -147,5 +172,6 @@ export function prefillFrom(registry: Registry, now: string): Prefill | undefine
     webUrl: uris.web ?? "",
     listLinks: Object.entries(uris).filter(([key]) => key !== "icon" && key !== "web"),
     keepsNfts: Boolean(snapshot.token?.nfts),
+    unorderable: unorderableKeys(history).length,
   };
 }

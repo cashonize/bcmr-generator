@@ -87,6 +87,21 @@
     void hashBytes(new TextEncoder().encode(text)).then((hex) => { committedHash.value = hex });
   }
 
+  // a count of one reads badly through inline ternaries, so the whole sentence agrees here
+  const unorderableNote = computed(() => {
+    const count = loadedInfo.value?.unorderable ?? 0;
+    if (!count) return null
+    return count === 1
+      ? {
+          lead: "1 snapshot on this identity has a timestamp that is not the spec's",
+          rest: "It is kept in the file untouched, but it cannot be ordered, so it is left out of working out which snapshot is the current one.",
+        }
+      : {
+          lead: `${count} snapshots on this identity have timestamps that are not the spec's`,
+          rest: "They are kept in the file untouched, but they cannot be ordered, so they are left out of working out which snapshot is the current one.",
+        }
+  });
+
   function clearLoaded() {
     loadedText.value = "";
     loadedBase.value = null;
@@ -329,6 +344,10 @@
         {{ loadedInfo.snapshotCount }} snapshot{{ loadedInfo.snapshotCount === 1 ? '' : 's' }} on this one.
         Generating adds a snapshot and bumps the minor version.
         <template v-if="loadedInfo.keepsNfts"> Its existing NFT types are carried over as they are.</template>
+        <div v-if="unorderableNote" class="loadWarning">
+          {{ unorderableNote.lead }} <code>YYYY-MM-DDTHH:mm:ss.sssZ</code> form.
+          {{ unorderableNote.rest }}
+        </div>
         <div class="versionRow">
           <span>New version</span>
           <input v-model="versionMajor" type="number" min="0" aria-label="major">
