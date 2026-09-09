@@ -1,6 +1,7 @@
 <script setup lang="ts">
-  import { computed, ref, watch } from "vue"
-  import { generateBcmr, validInputs } from "./generateBcmr"
+  import { computed, nextTick, ref, watch } from "vue"
+  import { generateBcmr } from "./generateBcmr"
+  import { validateDetails } from "./validate"
   import { parseRegistry, applyUpdate, prefillFrom, nextVersion, type Prefill } from "./updateBcmr"
   import type { Registry } from "./interfaces/bcmr-v2.schema"
   import ThemeToggle from './components/ThemeToggle.vue'
@@ -140,6 +141,13 @@
   // The preview tracks the form once it exists, so what is shown and what is
   // downloaded can never drift apart. That matters more than usual here: the hash
   // below is what a BCMR publication commits to on-chain.
+  // held back until the first generate, so an untouched form is not a wall of red
+  const showErrors = ref(false);
+  const issues = computed(() => validateDetails(buildDetails("1970-01-01T00:00:00.000Z")));
+  function issueFor(field: string): string | undefined {
+    return showErrors.value ? issues.value.find((i) => i.field === field)?.message : undefined
+  }
+
   function versionPart(input: string, fallback: number): number {
     const parsed = parseInt(input, 10);
     return Number.isNaN(parsed) || parsed < 0 ? fallback : parsed
@@ -213,15 +221,29 @@
   }, { immediate: true });
 
   function generateBcmrFile(){
+    showErrors.value = true;
     const date = new Date().toISOString();
     if(mode.value === "update" && !loadedBase.value){
       validationError.value = "Load the registry you are updating first.";
       generatedAt.value = null;
       return
     }
-    if(!validInputs(buildDetails(date))){
-      validationError.value = "Fill in all the required fields before generating the JSON file!";
+    const found = validateDetails(buildDetails(date));
+    if(found.length){
+      validationError.value = found.length === 1
+        ? "Fix the highlighted field, then generate."
+        : `Fix the ${found.length} highlighted fields, then generate.`;
       generatedAt.value = null;
+      // 2. the button is at the foot of a long form, so the first bad field is
+      // usually off-screen above it: take the user there rather than describing it
+      void nextTick().then(() => {
+        const firstError = document.querySelector(".fieldError");
+        if (!firstError) return
+        firstError.scrollIntoView({ block: "center", behavior: "smooth" });
+        const previous = firstError.previousElementSibling;
+        const input = previous instanceof HTMLInputElement ? previous : previous?.querySelector("input");
+        input?.focus({ preventScroll: true });
+      });
       return
     }
     validationError.value = "";
@@ -323,32 +345,41 @@
       <span><InfoTip text="The token's category id: 64 hex characters, shown as the category by any wallet holding the token.">TokenId</InfoTip> *</span>
       <span class="requiredNote">* marks a required field</span>
     </div>
-    <input v-model="tokenId" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f">
+    <input v-model="tokenId" :class="{ invalid: issueFor('tokenId') }" placeholder="8473d94f604de351cdee3030f6c354d36b257861ad8e95bbc0a06fbab2a2f">
+    <div v-if="issueFor('tokenId')" class="fieldError">{{ issueFor('tokenId') }}</div>
     <div><InfoTip text="The name wallets show for this token. Interfaces with limited space may hide it beyond the first 20 characters, so lead with what identifies it.">Token Name</InfoTip> *</div>
-    <input  v-model="tokenName" placeholder="DogeCash">
+    <input  v-model="tokenName" :class="{ invalid: issueFor('tokenName') }" placeholder="DogeCash">
+    <div v-if="issueFor('tokenName')" class="fieldError">{{ issueFor('tokenName') }}</div>
     <div><InfoTip text="A sentence or two about the token. Interfaces with limited space may hide it beyond 140 characters.">Token Description</InfoTip> *</div>
-    <input v-model="tokenDescription" placeholder="Don't let your dreams be memes">
+    <input v-model="tokenDescription" :class="{ invalid: issueFor('tokenDescription') }" placeholder="Don't let your dreams be memes">
+    <div v-if="issueFor('tokenDescription')" class="fieldError">{{ issueFor('tokenDescription') }}</div>
     <div><InfoTip text="Capital letters, numbers and dashes only, matching /^[-A-Z0-9]+$/ in the spec. This is the ticker wallets show next to an amount.">Token Symbol</InfoTip> *</div>
-    <input v-model="tokenSymbol" placeholder="DOGECASH">
+    <input v-model="tokenSymbol" :class="{ invalid: issueFor('tokenSymbol') }" placeholder="DOGECASH">
+    <div v-if="issueFor('tokenSymbol')" class="fieldError">{{ issueFor('tokenSymbol') }}</div>
     <div><InfoTip text="Must be a full URI including the scheme, e.g. https://... or ipfs://... A bare domain or path will not resolve. Clients are only required to support https and ipfs.">Link Icon (https or ipfs)</InfoTip></div>
-    <input v-model="iconUri" placeholder="https://example.com/Dogecoin_Logo.png">
+    <input v-model="iconUri" :class="{ invalid: issueFor('iconUri') }" placeholder="https://example.com/Dogecoin_Logo.png">
+    <div v-if="issueFor('iconUri')" class="fieldError">{{ issueFor('iconUri') }}</div>
     <div><InfoTip text="How divisible one token is: 0 to 18. With decimals of 2 an on-chain amount of 123456 is shown as 1234.56. Leave empty for 0, which is what an NFT-only category wants.">Decimals</InfoTip> (suggested to not use more than 8)</div>
-    <input v-model="tokenDecimals" type="number" placeholder="0">
+    <input v-model="tokenDecimals" type="number" :class="{ invalid: issueFor('tokenDecimals') }" placeholder="0">
+    <div v-if="issueFor('tokenDecimals')" class="fieldError">{{ issueFor('tokenDecimals') }}</div>
 
     <div><InfoTip text="Turn on if this category also issues NFTs. It adds an nfts block listing every NFT type by its on-chain commitment.">Has NFTs</InfoTip> <ToggleSwitch v-model="hasNftFields" /></div>
 
     <div v-if="hasNftFields" style="margin-left: 25px;">
       <div><InfoTip text="How many NFT entries to write, counting up from the starting number. One entry per commitment, so this is the size of the collection.">Number of unique NFTs</InfoTip> *</div>
-      <input v-model="numberNFTs" type="number" placeholder="10">
+      <input v-model="numberNFTs" type="number" :class="{ invalid: issueFor('numberNFTs') }" placeholder="10">
+    <div v-if="issueFor('numberNFTs')" class="fieldError">{{ issueFor('numberNFTs') }}</div>
       <div><InfoTip text="How each NFT's number becomes its on-chain commitment. VM-numbers is the spec's sequential encoding and what wallets expect: it is zero-based, so NFT 1 has an empty commitment, 2 is 01, and 129 is 8000 rather than 81. Hex is plain big-endian and only for old Cashonize collections.">Numbering on-chain</InfoTip></div>
       <select name="numbering" v-model="numbering" style="width: 350px;">
         <option value="vm-numbers">VM-numbers (default)</option>
         <option value="hex">hexadecimal (for old Cashonize collections)</option>
       </select>
       <div><InfoTip text="The number the first NFT carries, usually 1. It shifts both the names and the commitments, so it has to match how the collection was actually minted.">StartingNumber</InfoTip> *</div>
-      <input v-model="startingNumber" type="number" placeholder="1">
+      <input v-model="startingNumber" type="number" :class="{ invalid: issueFor('startingNumber') }" placeholder="1">
+    <div v-if="issueFor('startingNumber')" class="fieldError">{{ issueFor('startingNumber') }}</div>
       <div><InfoTip text="Written for every NFT in the collection, with {i} replaced by that NFT's number: ABC #{i} becomes ABC #1, ABC #2 and so on.">NFT Name</InfoTip> * ( <code>{i}</code> will be replaced by the NFT number)</div>
-      <input v-model="nftName" placeholder="ABC collection #{i}">
+      <input v-model="nftName" :class="{ invalid: issueFor('nftName') }" placeholder="ABC collection #{i}">
+    <div v-if="issueFor('nftName')" class="fieldError">{{ issueFor('nftName') }}</div>
       <div><InfoTip text="Same {i} substitution as the name. Optional: leave it empty and the NFTs get no description.">NFT Description</InfoTip> ( <code>{i}</code> will be replaced by the NFT number)</div>
       <input v-model="nftDescription" placeholder="Number {i} of the ABC collection with 500 NFTs">
       <b>Image folder:</b> The image folder should have the 400x400 NFT icons named as <code>1.png</code>,
@@ -356,9 +387,11 @@
       <span style="margin-left: 10px;">Optional high-res images should be included as <code>1-img.png</code>,
         <code>2-img.png</code>, etc.<br /></span>
       <div><InfoTip text="The folder holding the numbered images, as a full URI with its scheme and no trailing slash: each NFT's icon is this plus /1.png, /2.png and so on.">Link Image Folder (https or ipfs)</InfoTip></div>
-      <input v-model="nftIconUri" placeholder="ipfs://bafybeifz7yag2hlxvmaahyo5kl5etajycxtxsryadcawzt4dgy3hrzzxdq">
+      <input v-model="nftIconUri" :class="{ invalid: issueFor('nftIconUri') }" placeholder="ipfs://bafybeifz7yag2hlxvmaahyo5kl5etajycxtxsryadcawzt4dgy3hrzzxdq">
+    <div v-if="issueFor('nftIconUri')" class="fieldError">{{ issueFor('nftIconUri') }}</div>
       <div><InfoTip text="The file extension of the images in the folder, without the dot. It is appended to every NFT number, so all the files have to share it.">Image Type</InfoTip> (png, svg, ...)</div>
-      <input v-model="nftIconType" placeholder="png">
+      <input v-model="nftIconType" :class="{ invalid: issueFor('nftIconType') }" placeholder="png">
+    <div v-if="issueFor('nftIconType')" class="fieldError">{{ issueFor('nftIconType') }}</div>
       <div>
         <InfoTip text="Adds an image URI beside each icon, pointing at {i}-img in the same folder, for wallets that can show something larger than the 400x400 icon.">Has High-resolution Image for NFTs</InfoTip> (besides 400x400px icon)
         <ToggleSwitch v-model="hasImages" />
@@ -366,7 +399,8 @@
     </div>
 
     <div><InfoTip text="The project's own site, published as the web URI. Needs the full URL including https://.">Link website</InfoTip></div>
-    <input v-model="webUrl" placeholder="https://example.com">
+    <input v-model="webUrl" :class="{ invalid: issueFor('webUrl') }" placeholder="https://example.com">
+    <div v-if="issueFor('webUrl')" class="fieldError">{{ issueFor('webUrl') }}</div>
     <div style="margin: 5px 0;"><InfoTip text="Extra places this identity lives, keyed by the spec's standard names. Each value is a full URI with its scheme, so a social link is the profile URL, not a handle.">Extra Links</InfoTip>
       <button @click="removeUri" type="button" style="padding: 3px 5px; vertical-align: text-top; margin: 0 5px;">-</button>
       <button @click="addUri" type="button" style="padding: 3px 5px; vertical-align: text-top;">+</button>
@@ -390,6 +424,7 @@
         </select>
         <input placeholder="https://example.com" @input="(event) => listLinks[index][1] = (event.target as HTMLInputElement).value">
       </div>
+      <div v-if="issueFor(`listLinks.${index}`)" class="fieldError">{{ issueFor(`listLinks.${index}`) }}</div>
     </div>
 
     <input @click="generateBcmrFile" class="button primary" type="button" style="margin-top:15px" :value="mode === 'update' ? 'Generate updated BCMR' : 'Generate BCMR json file'">

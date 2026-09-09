@@ -3,13 +3,6 @@ import { bigIntToVmNumber, binToHex } from "@bitauth/libauth";
 import type { Registry, NftType } from "./interfaces/bcmr-v2.schema.js"
 import type { DetailsObj } from "./interfaces/interfaces.js";
 
-export function validInputs(details:DetailsObj) {
-  const { tokenId, tokenName, tokenDescription, tokenSymbol, hasNftFields, numberNFTs, nftName, startingNumber } = details
-  let hasRequiredFields = Boolean(tokenId && tokenName && tokenDescription && tokenSymbol);
-  if(hasNftFields) hasRequiredFields = Boolean(hasRequiredFields && numberNFTs && nftName && startingNumber);
-  return hasRequiredFields
-}
-
 export function generateBcmr(details:DetailsObj):Registry {
   // Generate BCMR json obj
   const bcmrJsonObj: Partial<Registry> = {

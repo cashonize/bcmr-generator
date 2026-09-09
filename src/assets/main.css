@@ -210,6 +210,24 @@ ul {
    Generated registry preview
    ========================================================================== */
 
+/* chota's input rule is `input:not(...)`, specificity (0,1,1), so marking a field
+   has to outrank it rather than rely on a bare class */
+input.invalid,
+input.invalid:hover,
+input.invalid:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 1px var(--color-error);
+}
+
+/* sits directly under the input it belongs to, so the message and the field it
+   is about are read together */
+.fieldError {
+  margin: 5px 0 2px;
+  font-size: 0.85em;
+  line-height: 1.4;
+  color: var(--color-error);
+}
+
 .formError {
   margin-top: 12px;
   padding: 10px 14px;

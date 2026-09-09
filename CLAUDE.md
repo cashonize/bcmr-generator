@@ -35,7 +35,10 @@ There is no test suite and no test runner installed.
 - **`src/App.vue`**: the whole form and all its state, as flat `ref()`s. `src/components/`
   is presentational only, and there is no store.
 - **`src/interfaces/interfaces.ts`**: `DetailsObj`, the contract between form and generator.
-- **`src/generateBcmr.ts`**: `validInputs()` and `generateBcmr()`, both pure.
+- **`src/generateBcmr.ts`**: `generateBcmr()`, a pure builder and nothing else.
+- **`src/validate.ts`**: all form validation. The rest of the app depends only on
+  `validateDetails()` and `FieldIssue`, so the implementation can be swapped without
+  touching callers.
 - **`src/updateBcmr.ts`**: the Update existing mode, merging a generated snapshot into a
   registry the user already published.
 - **`src/interfaces/bcmr-v2.schema.ts`**: types transcribed from the upstream schema. Treat
@@ -44,8 +47,12 @@ There is no test suite and no test runner installed.
 The things that bite:
 
 - **Adding a form field means touching four hand-wired places**: a `ref` in `App.vue`, a
-  field on `DetailsObj`, the literal in `buildDetails()`, and `generateBcmr()`, plus
-  `validInputs()` if it is required. Forgetting one is the likeliest bug here.
+  field on `DetailsObj`, the literal in `buildDetails()`, and `generateBcmr()`, plus a rule
+  in `validate.ts` if it needs one. Forgetting one is the likeliest bug here.
+- **Field rules guard what a typo would commit on-chain**, not just what is missing: a
+  tokenId that is not 64 hex names a garbage authbase, and a URI without a scheme (a bare
+  CID) resolves nowhere. Errors surface only after the first generate attempt, mark the
+  field, and scroll it into view, since the button sits below a long form.
 - **Every `DetailsObj` field is a `string`**, the numeric ones included; `generateBcmr()`
   does the parsing.
 - **The preview is a `computed` over the form, never a snapshot**, so it cannot disagree
