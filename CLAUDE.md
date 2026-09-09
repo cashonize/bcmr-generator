@@ -26,9 +26,12 @@ pnpm build        # vue-tsc --build && vite build
 pnpm type-check   # vue-tsc --build (vite build alone does not type-check)
 pnpm lint         # eslint . --fix
 pnpm preview      # serve the production build
+pnpm test         # vitest run
+pnpm test:watch   # vitest
 ```
 
-There is no test suite and no test runner installed.
+Tests live in `test/`, cover the pure modules only (`generateBcmr`, `updateBcmr`,
+`validate`), and are type-checked through `tsconfig.test.json`.
 
 ## Architecture
 

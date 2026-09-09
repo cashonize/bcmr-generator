@@ -1,0 +1,14 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "include": ["test/**/*", "src/*.ts", "src/interfaces/*.ts"],
+  "exclude": ["src/main.ts"],
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
